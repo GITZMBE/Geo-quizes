@@ -80,12 +80,14 @@ names; see the file's `note` field.
   `patient-shape-66081015`, region `aws-eu-central-1`). Connection string is
   in the local `.env` only (never committed). Initial migration has been
   applied directly against it.
-- **Netlify**: site `geo-quizes` exists (account `gitzmbe`) with
-  `DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL` already set as env vars, but
-  **is not yet linked to the GitHub repo for continuous deployment** and no
-  deploy has run yet. `netlify.toml` build command runs `prisma generate` but
-  **not** `prisma migrate deploy` — add that before relying on automatic
-  migrations for future schema changes.
+- **Netlify**: site `geo-quizes` (account `gitzmbe`) is linked to
+  `GITZMBE/Geo-quizes` on branch `master` for continuous deployment (reusing
+  the account's existing GitHub App installation — linked via the Netlify API
+  since local `netlify deploy` can't work on Windows: the Next.js plugin's
+  packaging step needs symlinks, which are unprivileged-blocked on Windows).
+  `DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL` are set as env vars.
+  `netlify.toml` build command runs `prisma migrate deploy && prisma generate`
+  before `next build`, so schema migrations apply automatically each deploy.
 - **Google OAuth**: `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET` are intentionally
   unset (pending). Login will not work anywhere — locally or deployed — until
   these are created in Google Cloud Console and set both locally and on

@@ -1,5 +1,10 @@
 [build]
   command = "npx prisma migrate deploy && npx prisma generate && npm run build"
 
+[functions]
+  # Netlify's own function bundler (independent of Next's build-output
+  # tracing) otherwise drops Prisma's native query-engine binary.
+  included_files = ["app/generated/prisma/*.node"]
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"

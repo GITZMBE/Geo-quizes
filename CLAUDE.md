@@ -52,22 +52,53 @@ and gotchas an agent working in this repo needs to know.
   methods imperatively on an instance. Use the forwarded `ref`
   (`useRef<GlobeMethods>(null)`) only for the couple of ref-only methods:
   `pointOfView()` and `controls()` (to set `enableRotate = false`). See
-  `StockholmGame.tsx` / `ClickDotMode.tsx` / `ProximityMode.tsx` for the
-  pattern. Don't reintroduce a manual globe.gl wrapper.
+  `ClickDotMode.tsx` / `ProximityMode.tsx` for the pattern (point-based
+  "guess the location" games, where a sphere is the more honest
+  representation of the task). Don't reintroduce a manual globe.gl wrapper.
 - **`polygonCapColor` can't have a nonzero-alpha "idle" fill on a
-  many-polygon game.** three-globe's polygon cap material is `transparent`
-  with `depthWrite: true` — a known bad combination once more than a
-  couple of same-frame polygons use it: confirmed by bisecting `USStatesGame`
-  (50 states) that 2 simultaneously-tinted caps render clean but 3+ produce
-  a hazy color wash across the *entire* globe, not just the polygons
-  themselves. Stockholm's/Sweden's district/region counts never hit this
-  because their `polygonCapColor` idle fallback is used at a zoom where it
-  wasn't scrutinized this closely — but the fix that generalizes is: return
-  fully transparent (`"rgba(0, 0, 0, 0)"`, not a low-alpha tint) for every
-  "idle" polygon, and only return a real color for the handful (1-2) that
-  are actually highlighted for correct/wrong feedback at any instant.
-  Borders (`polygonStrokeColor`) and click hit-testing are unaffected by an
-  invisible cap. See `USStatesGame.tsx`.
+  many-polygon *globe* game.** three-globe's polygon cap material is
+  `transparent` with `depthWrite: true` — a known bad combination once more
+  than a couple of same-frame polygons use it: confirmed by bisecting an
+  earlier globe-based US States prototype (50 states) that 2 simultaneously-
+  tinted caps render clean but 3+ produce a hazy color wash across the
+  *entire* globe, not just the polygons themselves. This is why click-a-
+  region games moved to `MapView` (below) instead of chasing this further —
+  if a future game ever renders many polygons on `GlobeView`, the fix is:
+  return fully transparent (`"rgba(0, 0, 0, 0)"`, not a low-alpha tint) for
+  every "idle" polygon, and only return a real color for the handful (1-2)
+  actually highlighted for correct/wrong feedback at any instant.
+- **`MapView` (`components/MapView.tsx`) is a flat 2D map (d3-geo + SVG),
+  used for click-a-region games instead of `GlobeView`.** Stockholm
+  Districts and US States both moved off `GlobeView` to `MapView` — a flat
+  projection is easier to click precisely than a rotatable sphere, and
+  sidesteps globe-only problems entirely (the `polygonCapColor` bug above,
+  Alaska/Hawaii camera framing, rotation-lock tradeoffs). Pass
+  `regionsData`/`fill`/`stroke`/`onRegionClick`/`label` as props, same
+  props-driven pattern as `GlobeView`. Gotchas specific to it:
+  - **Projection choice matters more than it looks.** `"mercator"` (default)
+    is fine for a single contiguous landmass. `"albersUsa"` natively insets
+    Alaska/Hawaii for the US States game. `"pacific"` (Mercator rotated
+    180°) exists because Oceania's own countries straddle the antimeridian
+    (Fiji spans -180..180, Kiribati -171.7..174.8) — the default Mercator's
+    `fitSize` bounding-box blows up to ~360° of longitude and squeezes every
+    country into a sliver otherwise. Add more rotated variants here rather
+    than fixing it in each game's data.
+  - **A real, non-self-intersecting polygon can still render as an unfilled
+    hole near the poles.** Confirmed with Canada's Ellesmere Island
+    (82.5°N): `@turf/kinks` found zero self-intersections in the source
+    geometry, so this is a d3-geo Mercator-at-extreme-latitude edge case,
+    not a data bug — neither rewinding (`@turf/rewind`) nor
+    `fillRule="evenodd"` fixed it. The data-prep-side fix is to drop any
+    ring reaching past ±80° latitude (see `scripts/build-world-countries.js`'s
+    `dropTinyRings`) — the same kind of threshold real web maps use (Web
+    Mercator caps at ~85.05°N/S).
+  - **A disproportionately large transcontinental country can dominate a
+    continent map's `fitSize` bounds.** Russia's Asian extent squeezed all
+    of Western/Central Europe into unclickable slivers on the Europe map —
+    fixed by clipping Russia's *map* geometry to west of the Urals
+    specifically (`scripts/build-world-countries.js`'s
+    `clipToEuropeanRussia`); its capital/flag data is unaffected since
+    those don't depend on the polygon extent.
 - **Prisma uses `prisma-client-js` with `engineType = "client"`**, output to
   `app/generated/prisma/`. Import from `@/app/generated/prisma`, not
   `@prisma/client` directly. `lib/prisma.ts` constructs the client with
@@ -99,8 +130,14 @@ choosing points-vs-polygons data shape, sourcing coordinates from GeoNames
 without fabricating them, the two canonical JSON envelopes, registering in
 `lib/games/registry.ts`, and the page-scaffolding patterns (GlobeView,
 nanostores atom shape via `useGameState`, score submission, leaderboard).
-Don't invent a third data
-shape or reimplement patterns it already documents.
+Don't invent a third data shape or reimplement patterns it already
+documents. The skill predates `MapView` and `useRoundGame` (see the
+gotchas above and the Countries-of-`<continent>` games below) — for a new
+click-a-region game, prefer `MapView` over `GlobeView` unless the game is
+genuinely globe-scale/rotatable; for a new game that's really N near-
+identical instances of the same round shape (e.g. one per continent/
+category), prefer `useRoundGame` + a shared mode component over one-off
+per-instance files.
 
 `lib/games/registry.ts` is the single source of truth for game/mode slugs,
 display names, and data file paths — both the UI and the API routes read
@@ -141,10 +178,9 @@ and sorted by population (`scripts/build-world-cities.js`) — no per-item
 proxying needed, unlike the Sweden data.
 
 4. **US States** (`/games/us-states`) — one mode, *Click the state*: a
-   state is named, click its outline on a freely-rotatable globe (Alaska
-   and Hawaii are real geographic distances from the mainland, unlike an
-   inset map, so — unlike Stockholm/Sweden — rotation isn't locked); POINTS,
-   one pass through all 50 states.
+   state is named, click its outline on a `MapView` using the `"albersUsa"`
+   projection, which natively insets Alaska/Hawaii near the mainland;
+   POINTS, one pass through all 50 states.
 
 `public/data/us_states.json` borders come from geoBoundaries' USA ADM1
 boundaries (public domain), filtered down to the 50 states (dropping DC +
@@ -152,9 +188,39 @@ boundaries (public domain), filtered down to the 50 states (dropping DC +
 (`scripts/build-us-states.js`) — both for file size (the raw simplified
 release is still ~5MB, mostly Alaska/Hawaii coastline) and render
 performance (Alaska alone had 586 separate island rings before dropping
-ones under 0.5% of its largest ring's area, which made three-globe take
-30s+ to build the scene). See the `polygonCapColor` gotcha above — this
-game is what surfaced it.
+ones under 0.5% of its largest ring's area).
+
+5. **List All Countries** (`/games/world-countries`) — one mode, *Type them
+   all*: free recall of all 197 sovereign countries, same autocomplete-and-
+   guess pattern as Sweden's cities game; TIME_MS.
+6. **Countries of Africa/Asia/Europe/North America/South America/Oceania**
+   (`/games/countries-<continent>`) — each with three modes, all POINTS,
+   one pass through that continent's countries:
+   - *Countries* — named country, click its outline on a `MapView`
+     (Oceania uses the `"pacific"` projection — see the `MapView` gotcha
+     above).
+   - *Capitals* — named country, type its capital.
+   - *Flags* — flag shown, type the country name.
+
+   These three modes are shared components (`components/games/
+   {CountriesMapMode,CapitalsMode,FlagsMode}.tsx`) parameterized by
+   `gameSlug` + country data, not one-off per-continent files — with 6
+   continents × 3 modes being 18 near-identical instances of the same
+   round-progression shape, that's genuinely warranted (see
+   `lib/games/useRoundGame.ts`, and `getRoundState(key)` in
+   `lib/state/gameAtoms.ts` for the per-instance persistent atom factory),
+   unlike the one-off mode files every other game uses.
+
+`public/data/world_countries.json` (points format) and
+`public/data/countries_<continent>.json` (GeoJSON, one per continent) come
+from Natural Earth's 1:50m Admin-0 country boundaries (public domain) for
+borders/continent, GeoNames' `countryInfo.txt` for capitals, and
+flagcdn.com for flag images (referenced by URL, not downloaded) —
+`scripts/build-world-countries.js`. Natural Earth's raw set includes
+dependencies/territories (Puerto Rico, Greenland, Hong Kong, etc.) and a
+few disputed territories alongside real countries; the script filters
+those out and documents exactly what's dropped and why in the output
+file's own `note` field.
 
 ## Infra / deployment status
 

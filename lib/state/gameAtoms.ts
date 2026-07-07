@@ -42,3 +42,12 @@ export const worldProximityState = atom({
   lastGuess: null as { lat: number; lng: number; distanceKm: number; points: number } | null,
   finished: false,
 });
+
+export const usStatesGameState = atom({
+  order: [] as string[],
+  index: 0,
+  score: 0,
+  lastClicked: null as string | null,
+  lastResult: null as RoundResult,
+  finished: false,
+});

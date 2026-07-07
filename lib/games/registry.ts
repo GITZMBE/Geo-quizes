@@ -41,6 +41,13 @@ export const GAMES: GameDefinition[] = [
     dataFile: "/data/world_largest_cities.json",
     modes: [{ slug: "proximity", name: "Guess the location", scoreType: "POINTS" }],
   },
+  {
+    slug: "us-states",
+    name: "US States",
+    description: "A state is named — click its outline on the map.",
+    dataFile: "/data/us_states.json",
+    modes: [{ slug: "click-state", name: "Click the state", scoreType: "POINTS" }],
+  },
 ];
 
 export function getGame(slug: string): GameDefinition | undefined {

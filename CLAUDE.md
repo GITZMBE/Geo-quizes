@@ -54,6 +54,20 @@ and gotchas an agent working in this repo needs to know.
   `pointOfView()` and `controls()` (to set `enableRotate = false`). See
   `StockholmGame.tsx` / `ClickDotMode.tsx` / `ProximityMode.tsx` for the
   pattern. Don't reintroduce a manual globe.gl wrapper.
+- **`polygonCapColor` can't have a nonzero-alpha "idle" fill on a
+  many-polygon game.** three-globe's polygon cap material is `transparent`
+  with `depthWrite: true` — a known bad combination once more than a
+  couple of same-frame polygons use it: confirmed by bisecting `USStatesGame`
+  (50 states) that 2 simultaneously-tinted caps render clean but 3+ produce
+  a hazy color wash across the *entire* globe, not just the polygons
+  themselves. Stockholm's/Sweden's district/region counts never hit this
+  because their `polygonCapColor` idle fallback is used at a zoom where it
+  wasn't scrutinized this closely — but the fix that generalizes is: return
+  fully transparent (`"rgba(0, 0, 0, 0)"`, not a low-alpha tint) for every
+  "idle" polygon, and only return a real color for the handful (1-2) that
+  are actually highlighted for correct/wrong feedback at any instant.
+  Borders (`polygonStrokeColor`) and click hit-testing are unaffected by an
+  invisible cap. See `USStatesGame.tsx`.
 - **Prisma uses `prisma-client-js` with `engineType = "client"`**, output to
   `app/generated/prisma/`. Import from `@/app/generated/prisma`, not
   `@prisma/client` directly. `lib/prisma.ts` constructs the client with
@@ -125,6 +139,22 @@ names; see the file's `note` field.
 from GeoNames' worldwide `cities15000` dump, filtered to feature class `P`
 and sorted by population (`scripts/build-world-cities.js`) — no per-item
 proxying needed, unlike the Sweden data.
+
+4. **US States** (`/games/us-states`) — one mode, *Click the state*: a
+   state is named, click its outline on a freely-rotatable globe (Alaska
+   and Hawaii are real geographic distances from the mainland, unlike an
+   inset map, so — unlike Stockholm/Sweden — rotation isn't locked); POINTS,
+   one pass through all 50 states.
+
+`public/data/us_states.json` borders come from geoBoundaries' USA ADM1
+boundaries (public domain), filtered down to the 50 states (dropping DC +
+5 territories that geoBoundaries includes in the same set) and simplified
+(`scripts/build-us-states.js`) — both for file size (the raw simplified
+release is still ~5MB, mostly Alaska/Hawaii coastline) and render
+performance (Alaska alone had 586 separate island rings before dropping
+ones under 0.5% of its largest ring's area, which made three-globe take
+30s+ to build the scene). See the `polygonCapColor` gotcha above — this
+game is what surfaced it.
 
 ## Infra / deployment status
 

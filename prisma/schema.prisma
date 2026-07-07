@@ -23,9 +23,13 @@ datasource db {
 model User {
   id            String    @id @default(cuid())
   name          String?
-  email         String?   @unique
+  email         String    @unique
   emailVerified DateTime?
   image         String?
+  // bcrypt hash — nullable only so the schema still supports adding an OAuth
+  // provider back later without a migration; the Credentials provider itself
+  // always requires it (see lib/auth.ts).
+  password      String?
 
   accounts Account[]
   sessions Session[]

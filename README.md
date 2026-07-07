@@ -1,6 +1,6 @@
 # Geo Quizzes
 
-Interactive geography quiz app. Sign in with Google to play map-based quizzes and climb the leaderboards.
+Interactive geography quiz app. Sign up with an email and password to play map-based quizzes and climb the leaderboards.
 
 ## Stack
 
@@ -8,8 +8,8 @@ Interactive geography quiz app. Sign in with Google to play map-based quizzes an
 - **Tailwind CSS v4** — theme tokens defined in `app/globals.css` (`@theme`), used as `bg-primary`, `text-error`, etc.
 - **Recoil** — client-side game state
 - **globe.gl** — interactive map/globe visualizations (`components/GlobeView.tsx`)
-- **Prisma + PostgreSQL** — users, games, scores
-- **Auth.js (NextAuth v5)** — Google OAuth, JWT sessions (`lib/auth.config.ts` is the Edge-safe base used by `proxy.ts`; `lib/auth.ts` extends it with the Prisma adapter for use in routes/pages)
+- **Prisma + PostgreSQL** — users, games, scores (via `@prisma/adapter-neon`, no native query-engine binary — required for this to run in a Netlify Function at all)
+- **Auth.js (NextAuth v5)** — email/password Credentials provider + bcrypt, JWT sessions (`lib/auth.config.ts` is the Edge-safe base used by `proxy.ts`; `lib/auth.ts` extends it with the real `authorize()` + Prisma adapter for use in routes/pages)
 - **Docker** — app + Postgres via `docker-compose.yml`
 
 ## Games
@@ -24,6 +24,7 @@ Game data lives in `public/data/*.json`. `lib/games/registry.ts` is the source o
 
 ## API
 
+- `POST /api/auth/register` — create an account (`{ email, password, name? }`).
 - `POST /api/scores` — submit a result (`{ gameSlug, mode, value }`), requires auth.
 - `GET /api/games/[slug]/leaderboard?mode=<mode>` — top 10 scores for a game/mode.
 - `GET|POST /api/auth/*` — handled by Auth.js.
@@ -31,13 +32,13 @@ Game data lives in `public/data/*.json`. `lib/games/registry.ts` is the source o
 ## Local development
 
 ```bash
-cp .env.example .env   # fill in DATABASE_URL, AUTH_SECRET, AUTH_GOOGLE_ID/SECRET
+cp .env.example .env   # fill in DATABASE_URL, AUTH_SECRET
 npm install
 npx prisma migrate dev
 npm run dev
 ```
 
-Generate `AUTH_SECRET` with `npx auth secret`. Create Google OAuth credentials in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials) with redirect URI `http://localhost:3000/api/auth/callback/google`.
+Generate `AUTH_SECRET` with `npx auth secret`.
 
 ## Docker
 
@@ -45,8 +46,8 @@ Generate `AUTH_SECRET` with `npx auth secret`. Create Google OAuth credentials i
 docker compose up --build
 ```
 
-Runs the app + a Postgres container. Set `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` in your shell/`.env` before starting — `docker-compose.yml` passes them through.
+Runs the app + a Postgres container. Set `AUTH_SECRET` in your shell/`.env` before starting — `docker-compose.yml` passes it through.
 
 ## Deployment
 
-Configured for **Netlify** (`netlify.toml`, `@netlify/plugin-nextjs`). Set the same env vars (`DATABASE_URL`, `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `NEXTAUTH_URL`) in the Netlify site's environment settings — the local Dockerized Postgres is dev-only, production needs a reachable hosted Postgres instance.
+Configured for **Netlify** (`netlify.toml`, `@netlify/plugin-nextjs`). Set the same env vars (`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`) in the Netlify site's environment settings — the local Dockerized Postgres is dev-only, production needs a reachable hosted Postgres instance (this project uses Neon).

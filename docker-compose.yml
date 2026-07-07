@@ -27,8 +27,6 @@ services:
     environment:
       DATABASE_URL: postgresql://geoquizzes:geoquizzes@db:5432/geoquizzes
       AUTH_SECRET: ${AUTH_SECRET}
-      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID}
-      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
 
 volumes:

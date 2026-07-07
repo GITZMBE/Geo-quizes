@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { auth, signIn, signOut } from "@/lib/auth";
+import { auth, signOut } from "@/lib/auth";
+import { AuthForm } from "@/components/AuthForm";
 
 export default async function Home() {
   const session = await auth();
@@ -38,19 +39,7 @@ export default async function Home() {
           </form>
         </div>
       ) : (
-        <form
-          action={async () => {
-            "use server";
-            await signIn("google");
-          }}
-        >
-          <button
-            type="submit"
-            className="rounded-md bg-primary px-6 py-3 font-medium text-primary-foreground hover:opacity-90"
-          >
-            Sign in with Google
-          </button>
-        </form>
+        <AuthForm />
       )}
     </main>
   );

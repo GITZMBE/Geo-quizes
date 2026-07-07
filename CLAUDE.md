@@ -1,16 +1,24 @@
 # Geo Quizzes
 
-Interactive geography quiz web app: log in with Google, play map-based quiz
-games, compete on per-game leaderboards. See `README.md` for stack summary
-and local setup/run commands — this file covers conventions and gotchas an
-agent working in this repo needs to know.
+Interactive geography quiz web app: sign up with email/password, play
+map-based quiz games, compete on per-game leaderboards. See `README.md` for
+stack summary and local setup/run commands — this file covers conventions
+and gotchas an agent working in this repo needs to know.
 
 ## Architecture gotchas (read before touching auth/state/data)
 
-- **Auth is split into two files** to keep Prisma out of the Edge runtime:
-  `lib/auth.config.ts` is the Edge-safe base (providers, JWT callbacks, no
-  adapter) and is what `proxy.ts` uses directly. `lib/auth.ts` extends it with
-  the Prisma adapter, for use only in pages/API routes. Don't import
+- **Auth is Credentials-based (email + password + bcrypt), not OAuth.**
+  `POST /api/auth/register` creates the `User` row (hashed password via
+  `bcryptjs` — pure JS, no native binary, same reasoning as the Prisma
+  adapter below). `lib/auth.ts`'s `authorize()` looks the user up and
+  compares the password. There's no email verification or password-reset
+  flow — out of scope unless asked for.
+- **Auth is split into two files** to keep Prisma/bcrypt out of the Edge
+  runtime: `lib/auth.config.ts` is the Edge-safe base (a stub Credentials
+  provider whose `authorize` is never actually called — middleware only
+  verifies the JWT, it never invokes a provider) and is what `proxy.ts` uses
+  directly. `lib/auth.ts` extends it with the *real* `authorize()` and the
+  Prisma adapter, for use only in pages/API routes. Don't import
   `lib/auth.ts` from `proxy.ts` or anything else that runs in Edge middleware.
 - **`proxy.ts`** (Next.js 16 renamed `middleware.ts` → `proxy.ts`) gates all
   page routes behind login except `/`, but its matcher **excludes `/api/*`
@@ -105,7 +113,6 @@ names; see the file's `note` field.
   `@prisma/adapter-neon` + `engineType = "client"` fix — this took several
   deploy cycles to get right, see the Prisma bullet above for the two dead
   ends already ruled out.
-- **Google OAuth**: `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET` are intentionally
-  unset (pending). Login will not work anywhere — locally or deployed — until
-  these are created in Google Cloud Console and set both locally and on
-  Netlify, with redirect URIs for both `localhost:3000` and the Netlify URL.
+- **Auth**: switched from Google OAuth to a Credentials (email/password)
+  provider — see the architecture bullet above. No `AUTH_GOOGLE_*` env vars
+  needed anywhere anymore.

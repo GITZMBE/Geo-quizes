@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // One-off Node data-prep scripts, not part of the app.
     "scripts/**",
+    // Prisma's own generated client code.
+    "app/generated/**",
   ]),
 ]);
 

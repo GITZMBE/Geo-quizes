@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { GlobeMethods } from "react-globe.gl";
 import { useGameState } from "@/lib/state/useGameState";
-import { GlobeView } from "@/components/GlobeView";
+import { MapView } from "@/components/MapView";
 import { Leaderboard } from "@/components/Leaderboard";
 import { usStatesGameState } from "@/lib/state/gameAtoms";
 import { fetchRegions, type RegionFeature } from "@/lib/games/data";
@@ -14,15 +13,7 @@ import { getGame } from "@/lib/games/registry";
 const game = getGame("us-states")!;
 const mode = game.modes[0];
 
-// Framed on the contiguous states — Alaska and Hawaii are real geographic
-// distances away (unlike an inset map), so rotation stays enabled (unlike
-// Stockholm/Sweden's locked regional camera) and the player pans/zooms to
-// reach them and to precisely click small states.
-const US_VIEW = { lat: 40, lng: -98, altitude: 1.6 };
-
 export default function USStatesGame() {
-  const globeRef = useRef<GlobeMethods>(null);
-  const [globeReady, setGlobeReady] = useState(false);
   const [states, setStates] = useState<RegionFeature[] | null>(null);
   const [state, setState] = useGameState(usStatesGameState);
   const submittedRef = useRef(false);
@@ -48,20 +39,10 @@ export default function USStatesGame() {
     });
   }, [states, setState]);
 
-  // Set the initial camera once the globe + states are ready. Gated on
-  // globeReady (react-globe.gl's onGlobeReady), not just `states` —
-  // GlobeView mounts the actual globe asynchronously (after its
-  // ResizeObserver reports a real size), so globeRef.current can still be
-  // null when `states` first resolves.
-  useEffect(() => {
-    if (!states || !globeReady) return;
-    globeRef.current?.pointOfView(US_VIEW, 0);
-  }, [states, globeReady]);
-
   const target = state.order[state.index];
 
-  function handlePolygonClick(polygon: object) {
-    const clickedName = (polygon as RegionFeature).properties.name;
+  function handlePolygonClick(feature: RegionFeature) {
+    const clickedName = feature.properties.name;
     setState((prev) => {
       if (prev.finished || prev.lastResult) return prev;
       const currentTarget = prev.order[prev.index];
@@ -143,33 +124,22 @@ export default function USStatesGame() {
 
           <div className="relative flex-1 rounded-lg border border-border overflow-hidden">
             {states && (
-              <GlobeView
-                ref={globeRef}
-                onGlobeReady={() => setGlobeReady(true)}
-                polygonsData={states}
-                polygonAltitude={0.008}
-                polygonStrokeColor={() => "#0f172a"}
-                polygonLabel={(f) => (f as RegionFeature).properties.name}
-                polygonCapColor={(f) => {
-                  const name = (f as RegionFeature).properties.name;
+              <MapView
+                regionsData={states}
+                projection="albersUsa"
+                stroke={() => "#0f172a"}
+                label={(f) => f.properties.name}
+                fill={(f) => {
+                  const name = f.properties.name;
                   if (state.lastResult) {
                     if (name === target) return "rgba(22, 163, 74, 0.75)";
                     if (name === state.lastClicked && state.lastResult === "wrong") {
                       return "rgba(220, 38, 38, 0.75)";
                     }
                   }
-                  // Fully transparent, not a faint tint, for every other
-                  // state — three-globe's polygon cap material is
-                  // transparent + depthWrite:true, which produces a hazy
-                  // colored wash across the whole globe once more than a
-                  // couple of polygons share a nonzero-alpha cap color at
-                  // once (confirmed by bisecting: 2 tinted caps render
-                  // clean, 3+ don't). At most 1-2 states are ever
-                  // colored here (the target/last-clicked pair during
-                  // feedback), which stays under that threshold.
-                  return "rgba(0, 0, 0, 0)";
+                  return "rgba(37, 99, 235, 0.15)";
                 }}
-                onPolygonClick={handlePolygonClick}
+                onRegionClick={handlePolygonClick}
               />
             )}
           </div>

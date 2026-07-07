@@ -61,7 +61,15 @@ export function TypeAllMode({ cities }: { cities: City[] }) {
 
   function handleChange(value: string) {
     const suggestion = getAutocomplete(value, remaining);
-    setInput(suggestion ?? value);
+    if (suggestion) {
+      const match = remaining.find((c) => c.name === suggestion);
+      if (match) {
+        setState((prev) => ({ ...prev, guessedRanks: [...prev.guessedRanks, match.rank] }));
+      }
+      setInput("");
+      return;
+    }
+    setInput(value);
   }
 
   function handleSubmit() {

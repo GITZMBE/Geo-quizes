@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GlobeMethods } from "react-globe.gl";
 import { useGameState } from "@/lib/state/useGameState";
 import { GlobeView } from "@/components/GlobeView";
@@ -21,6 +21,7 @@ type MarkerPoint = { lat: number; lng: number; color: string };
 
 export function ProximityMode({ cities }: { cities: City[] }) {
   const globeRef = useRef<GlobeMethods>(null);
+  const [globeReady, setGlobeReady] = useState(false);
   const [state, setState] = useGameState(swedenProximityState);
   const submittedRef = useRef(false);
 
@@ -38,12 +39,17 @@ export function ProximityMode({ cities }: { cities: City[] }) {
     }
   }, [cities, state.order.length, setState]);
 
+  // Gated on globeReady (react-globe.gl's onGlobeReady), not just
+  // `cities.length` — GlobeView mounts the actual globe asynchronously
+  // (after its ResizeObserver reports a real size), and cities.length is
+  // already nonzero on this component's very first render, so relying on
+  // it alone races the ref and silently no-ops.
   useEffect(() => {
-    if (cities.length === 0) return;
+    if (cities.length === 0 || !globeReady) return;
     globeRef.current?.pointOfView(SWEDEN_VIEW, 0);
     const controls = globeRef.current?.controls();
     if (controls) controls.enableRotate = false;
-  }, [cities.length]);
+  }, [cities.length, globeReady]);
 
   const target = byRank.get(state.order[state.index]);
 
@@ -143,9 +149,10 @@ export function ProximityMode({ cities }: { cities: City[] }) {
               </div>
             )}
           </div>
-          <div className="flex-1 rounded-lg border border-border overflow-hidden">
+          <div className="relative flex-1 rounded-lg border border-border overflow-hidden">
             <GlobeView
               ref={globeRef}
+              onGlobeReady={() => setGlobeReady(true)}
               pointsData={points}
               pointColor={(p) => (p as MarkerPoint).color}
               pointAltitude={0.01}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GlobeMethods } from "react-globe.gl";
 import { useGameState } from "@/lib/state/useGameState";
 import { GlobeView } from "@/components/GlobeView";
@@ -18,6 +18,7 @@ const SWEDEN_VIEW = { lat: 62.5, lng: 16.5, altitude: 1.1 };
 
 export function ClickDotMode({ cities }: { cities: City[] }) {
   const globeRef = useRef<GlobeMethods>(null);
+  const [globeReady, setGlobeReady] = useState(false);
   const [state, setState] = useGameState(swedenClickDotState);
   const submittedRef = useRef(false);
 
@@ -36,12 +37,17 @@ export function ClickDotMode({ cities }: { cities: City[] }) {
     }
   }, [cities, state.order.length, setState]);
 
+  // Gated on globeReady (react-globe.gl's onGlobeReady), not just
+  // `cities.length` — GlobeView mounts the actual globe asynchronously
+  // (after its ResizeObserver reports a real size), and cities.length is
+  // already nonzero on this component's very first render, so relying on
+  // it alone races the ref and silently no-ops.
   useEffect(() => {
-    if (cities.length === 0) return;
+    if (cities.length === 0 || !globeReady) return;
     globeRef.current?.pointOfView(SWEDEN_VIEW, 0);
     const controls = globeRef.current?.controls();
     if (controls) controls.enableRotate = false;
-  }, [cities.length]);
+  }, [cities.length, globeReady]);
 
   const target = byRank.get(state.order[state.index]);
 
@@ -113,9 +119,10 @@ export function ClickDotMode({ cities }: { cities: City[] }) {
               ({state.index + 1}/{state.order.length}) · Score: {state.score}
             </span>
           </div>
-          <div className="flex-1 rounded-lg border border-border overflow-hidden">
+          <div className="relative flex-1 rounded-lg border border-border overflow-hidden">
             <GlobeView
               ref={globeRef}
+              onGlobeReady={() => setGlobeReady(true)}
               pointsData={cities}
               pointAltitude={0.01}
               pointRadius={0.35}

@@ -18,6 +18,7 @@ const STOCKHOLM_VIEW = { lat: 59.32, lng: 18.06, altitude: 0.35 };
 
 export default function StockholmGame() {
   const globeRef = useRef<GlobeMethods>(null);
+  const [globeReady, setGlobeReady] = useState(false);
   const [districts, setDistricts] = useState<DistrictFeature[] | null>(null);
   const [state, setState] = useGameState(stockholmGameState);
   const submittedRef = useRef(false);
@@ -37,13 +38,17 @@ export default function StockholmGame() {
     });
   }, [setState]);
 
-  // Lock the camera once the globe + districts are ready.
+  // Lock the camera once the globe + districts are ready. Gated on
+  // globeReady (react-globe.gl's onGlobeReady), not just `districts` —
+  // GlobeView mounts the actual globe asynchronously (after its
+  // ResizeObserver reports a real size), so globeRef.current can still be
+  // null when `districts` first resolves.
   useEffect(() => {
-    if (!districts) return;
+    if (!districts || !globeReady) return;
     globeRef.current?.pointOfView(STOCKHOLM_VIEW, 0);
     const controls = globeRef.current?.controls();
     if (controls) controls.enableRotate = false;
-  }, [districts]);
+  }, [districts, globeReady]);
 
   const target = state.order[state.index];
 
@@ -128,10 +133,11 @@ export default function StockholmGame() {
             )}
           </div>
 
-          <div className="flex-1 rounded-lg border border-border overflow-hidden">
+          <div className="relative flex-1 rounded-lg border border-border overflow-hidden">
             {districts && (
               <GlobeView
                 ref={globeRef}
+                onGlobeReady={() => setGlobeReady(true)}
                 polygonsData={districts}
                 polygonAltitude={0.008}
                 polygonSideColor={() => "rgba(15, 23, 42, 0.1)"}

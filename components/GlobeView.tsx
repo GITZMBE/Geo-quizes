@@ -12,6 +12,14 @@ import ReactGlobe, { type GlobeMethods, type GlobeProps } from "react-globe.gl";
 // pointColor, onPolygonClick, etc.) instead of calling methods imperatively;
 // use the forwarded ref only for the few ref-only methods (pointOfView,
 // controls()).
+//
+// The measuring container is `absolute inset-0`, not `h-full w-full`: every
+// caller sizes it via a `flex-1` wrapper, and a `flex-1` item's height comes
+// from flex-grow rather than a specified value, so a percentage-height
+// child can't reliably resolve against it (circular auto-height dependency)
+// — it measures 0 in practice. Absolute positioning resolves against the
+// nearest positioned ancestor's actual box instead, so callers just need
+// `relative` on that wrapper.
 export const GlobeView = forwardRef<GlobeMethods, GlobeProps>(function GlobeView(props, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -30,7 +38,7 @@ export const GlobeView = forwardRef<GlobeMethods, GlobeProps>(function GlobeView
   }, []);
 
   return (
-    <div ref={containerRef} className="h-full w-full">
+    <div ref={containerRef} className="absolute inset-0">
       {size.width > 0 && size.height > 0 && (
         <ReactGlobe
           // react-globe.gl's own .d.ts types its ref as MutableRefObject
@@ -41,6 +49,11 @@ export const GlobeView = forwardRef<GlobeMethods, GlobeProps>(function GlobeView
           width={size.width}
           height={size.height}
           backgroundColor="rgba(0,0,0,0)"
+          // Without a globeImageUrl, three-globe's default material is
+          // flat black (see defaultGlobeMaterial in three-globe/src/layers/globe.js)
+          // — every caller here relies on this default rather than passing
+          // its own, so it lives here instead of being repeated 3x.
+          globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
           {...props}
         />
       )}

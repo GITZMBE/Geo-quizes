@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRecoilState } from "recoil";
+import { useGameState } from "@/lib/state/useGameState";
 import { swedenTypeAllState } from "@/lib/state/gameAtoms";
 import type { City } from "@/lib/games/data";
 import { submitScore, formatScoreValue } from "@/lib/games/scores";
@@ -21,7 +21,7 @@ function getAutocomplete(input: string, remaining: City[]): string | null {
 }
 
 export function TypeAllMode({ cities }: { cities: City[] }) {
-  const [state, setState] = useRecoilState(swedenTypeAllState);
+  const [state, setState] = useGameState(swedenTypeAllState);
   const [input, setInput] = useState("");
   const [now, setNow] = useState<number | null>(() => Date.now());
   const inputRef = useRef<HTMLInputElement>(null);

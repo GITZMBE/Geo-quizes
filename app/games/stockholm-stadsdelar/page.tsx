@@ -2,9 +2,8 @@
 
 import dynamic from "next/dynamic";
 
-// Recoil's hook implementation isn't safe to execute during Next.js's server
-// prerender pass under React 19 (it reaches into internals that changed
-// shape), so this game's content is loaded client-only.
+// This game uses browser-only APIs (globe.gl) and is behind login with no
+// SEO value, so there's nothing gained from prerendering it.
 const StockholmGame = dynamic(() => import("./StockholmGame"), {
   ssr: false,
   loading: () => <p className="p-8 text-muted-foreground">Loading...</p>,

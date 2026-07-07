@@ -6,7 +6,7 @@ Interactive geography quiz app. Sign up with an email and password to play map-b
 
 - **Next.js** (App Router, TypeScript) — frontend + API routes in one app
 - **Tailwind CSS v4** — theme tokens defined in `app/globals.css` (`@theme`), used as `bg-primary`, `text-error`, etc.
-- **Recoil** — client-side game state
+- **nanostores** — client-side game state (`lib/state/useGameState.ts` wraps it with a `useRecoilState`-like API)
 - **globe.gl** — interactive map/globe visualizations (`components/GlobeView.tsx`)
 - **Prisma + PostgreSQL** — users, games, scores (via `@prisma/adapter-neon`, no native query-engine binary — required for this to run in a Netlify Function at all)
 - **Auth.js (NextAuth v5)** — email/password Credentials provider + bcrypt, JWT sessions (`lib/auth.config.ts` is the Edge-safe base used by `proxy.ts`; `lib/auth.ts` extends it with the real `authorize()` + Prisma adapter for use in routes/pages)

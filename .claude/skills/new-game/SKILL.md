@@ -127,15 +127,18 @@ codebase to reuse rather than reinvent:
   `.pointsData()`, `.onPolygonClick()` / `.onPointClick()` /
   `.onGlobeClick()`, `.pointOfView()`, and `globe.controls().enableRotate =
   false` to lock it into "flat map" behavior for a country/region-scale quiz).
-- **Per-game round state**: a Recoil atom in `lib/state/gameAtoms.ts`
+- **Per-game round state**: a `nanostores` atom in `lib/state/gameAtoms.ts`
   (order/index/score/lastResult/finished shape — copy the pattern from
-  `stockholmGameState` or `swedenClickDotState`).
-- **Client-only mode components under React 19 + Next.js SSR**: Recoil's
-  hooks aren't safe during Next's server prerender pass. Load any
-  Recoil-using game component via `next/dynamic` with `{ ssr: false }` from a
-  thin `page.tsx` (see `app/games/stockholm-stadsdelar/page.tsx` and
-  `app/games/sweden-cities/page.tsx` for the pattern) rather than using the
-  hooks directly in the page's default export.
+  `stockholmGameState` or `swedenClickDotState`), read via `useGameState`
+  from `lib/state/useGameState.ts` (mirrors `useRecoilState`'s
+  `[state, setState]` shape — Recoil itself was ripped out, it's
+  fundamentally incompatible with React 19). Don't reach for Recoil again.
+- **Client-only mode components**: these use browser-only APIs (globe.gl)
+  and sit behind login with no SEO value, so load them via `next/dynamic`
+  with `{ ssr: false }` from a thin `page.tsx` (see
+  `app/games/stockholm-stadsdelar/page.tsx` and
+  `app/games/sweden-cities/page.tsx` for the pattern) rather than using them
+  directly in the page's default export.
 - **Score submission**: `submitScore(gameSlug, modeSlug, value)` from
   `lib/games/scores.ts` once a run finishes.
 - **Leaderboard display**: `<Leaderboard gameSlug={...} mode={...} />` from

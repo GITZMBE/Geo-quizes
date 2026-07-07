@@ -21,16 +21,24 @@ and gotchas an agent working in this repo needs to know.
   Prisma adapter, for use only in pages/API routes. Don't import
   `lib/auth.ts` from `proxy.ts` or anything else that runs in Edge middleware.
 - **`proxy.ts`** (Next.js 16 renamed `middleware.ts` → `proxy.ts`) gates all
-  page routes behind login except `/`, but its matcher **excludes `/api/*`
-  entirely** — API routes return their own 401 JSON via each route's own
-  `auth()` check, rather than being redirected to an HTML page.
-- **Recoil does not survive Next.js's SSR/prerender pass under React 19** —
-  calling `useRecoilState` while the server prerenders a page crashes with a
-  `ReactCurrentDispatcher` error. Every page that uses Recoil-backed game
-  state is a thin `"use client"` `page.tsx` that loads the real component via
-  `next/dynamic(() => import(...), { ssr: false })`. Follow this pattern for
-  any new game page — see `app/games/stockholm-stadsdelar/page.tsx` /
-  `StockholmGame.tsx` for the reference split.
+  page routes behind login except `/`, `/sign-in`, `/sign-up`, but its matcher
+  **excludes `/api/*` entirely** — API routes return their own 401 JSON via
+  each route's own `auth()` check, rather than being redirected to an HTML
+  page. It also redirects already-logged-in users away from `/sign-in` and
+  `/sign-up` to `/games`.
+- **State management is `nanostores`, not Recoil.** Recoil was the original
+  choice but turned out to be fundamentally incompatible with React 19 —
+  not just an SSR/prerender issue, it crashes at runtime in the browser too
+  (`useRecoilState` reaches into
+  `React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher`,
+  whose shape changed in React 19, and Recoil hasn't been updated since).
+  `lib/state/useGameState.ts` wraps `@nanostores/react`'s `useStore` to mirror
+  `useRecoilState`'s exact `[state, setState]` shape (setState accepts a
+  value or an updater function), so game components barely changed — see
+  `lib/state/gameAtoms.ts` for the atom definitions. Use `useGameState` for
+  any new per-component game state; there's no cross-component sharing
+  currently, so plain nanostores atoms (not computed/derived stores) are
+  the right level of complexity.
 - **Prisma uses `prisma-client-js` with `engineType = "client"`**, output to
   `app/generated/prisma/`. Import from `@/app/generated/prisma`, not
   `@prisma/client` directly. `lib/prisma.ts` constructs the client with
@@ -61,7 +69,8 @@ Use the **`new-game` skill** (`.claude/skills/new-game/SKILL.md`) — it covers
 choosing points-vs-polygons data shape, sourcing coordinates from GeoNames
 without fabricating them, the two canonical JSON envelopes, registering in
 `lib/games/registry.ts`, and the page-scaffolding patterns (GlobeView,
-Recoil atom shape, score submission, leaderboard). Don't invent a third data
+nanostores atom shape via `useGameState`, score submission, leaderboard).
+Don't invent a third data
 shape or reimplement patterns it already documents.
 
 `lib/games/registry.ts` is the single source of truth for game/mode slugs,

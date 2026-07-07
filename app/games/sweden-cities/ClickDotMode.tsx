@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRecoilState } from "recoil";
+import { useGameState } from "@/lib/state/useGameState";
 import type { GlobeInstance } from "globe.gl";
 import { GlobeView } from "@/components/GlobeView";
 import { Leaderboard } from "@/components/Leaderboard";
@@ -18,7 +18,7 @@ const SWEDEN_VIEW = { lat: 62.5, lng: 16.5, altitude: 1.1 };
 
 export function ClickDotMode({ cities }: { cities: City[] }) {
   const [globe, setGlobe] = useState<GlobeInstance | null>(null);
-  const [state, setState] = useRecoilState(swedenClickDotState);
+  const [state, setState] = useGameState(swedenClickDotState);
   const submittedRef = useRef(false);
 
   const byRank = new Map(cities.map((c) => [c.rank, c]));

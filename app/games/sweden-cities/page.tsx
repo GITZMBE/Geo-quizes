@@ -5,8 +5,8 @@ import dynamic from "next/dynamic";
 import { getGame } from "@/lib/games/registry";
 import { fetchCities, type City } from "@/lib/games/data";
 
-// Recoil hooks in these mode components aren't safe to execute during Next.js's
-// server prerender pass under React 19, so they're loaded client-only.
+// These mode components use browser-only APIs (globe.gl) and are behind
+// login with no SEO value, so there's nothing gained from prerendering them.
 const TypeAllMode = dynamic(() => import("./TypeAllMode").then((m) => m.TypeAllMode), {
   ssr: false,
 });

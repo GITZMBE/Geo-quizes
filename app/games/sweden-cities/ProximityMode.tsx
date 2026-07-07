@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRecoilState } from "recoil";
+import { useGameState } from "@/lib/state/useGameState";
 import type { GlobeInstance } from "globe.gl";
 import { GlobeView } from "@/components/GlobeView";
 import { Leaderboard } from "@/components/Leaderboard";
@@ -21,7 +21,7 @@ type MarkerPoint = { lat: number; lng: number; color: string };
 
 export function ProximityMode({ cities }: { cities: City[] }) {
   const [globe, setGlobe] = useState<GlobeInstance | null>(null);
-  const [state, setState] = useRecoilState(swedenProximityState);
+  const [state, setState] = useGameState(swedenProximityState);
   const submittedRef = useRef(false);
 
   const byRank = new Map(cities.map((c) => [c.rank, c]));

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRecoilState } from "recoil";
+import { useGameState } from "@/lib/state/useGameState";
 import type { GlobeInstance } from "globe.gl";
 import { GlobeView } from "@/components/GlobeView";
 import { Leaderboard } from "@/components/Leaderboard";
@@ -19,7 +19,7 @@ const STOCKHOLM_VIEW = { lat: 59.32, lng: 18.06, altitude: 0.35 };
 export default function StockholmGame() {
   const [globe, setGlobe] = useState<GlobeInstance | null>(null);
   const [districts, setDistricts] = useState<DistrictFeature[] | null>(null);
-  const [state, setState] = useRecoilState(stockholmGameState);
+  const [state, setState] = useGameState(stockholmGameState);
   const submittedRef = useRef(false);
 
   // Load district borders + start a fresh shuffled run on mount.

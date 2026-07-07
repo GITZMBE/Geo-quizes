@@ -19,18 +19,29 @@ export function GlobeView({ onReady }: GlobeViewProps) {
   }, [onReady]);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    if (!containerRef.current) return;
 
     let globe: GlobeInstance | undefined;
     let cancelled = false;
 
     import("globe.gl").then(({ default: Globe }) => {
-      if (cancelled || !container) return;
-      globe = new Globe(container)
-        .backgroundColor("rgba(0,0,0,0)")
-        .width(container.clientWidth)
-        .height(container.clientHeight);
+      // Re-check freshly (not the value captured above) — by the time this
+      // async import resolves, the component may have unmounted (e.g. the
+      // user switched game mode tabs) and the container detached from the
+      // document. globe.gl's init() unconditionally does
+      // `domNode.innerHTML = ""`, which throws on a null/detached node.
+      const container = containerRef.current;
+      if (cancelled || !container || !container.isConnected) return;
+
+      try {
+        globe = new Globe(container)
+          .backgroundColor("rgba(0,0,0,0)")
+          .width(container.clientWidth)
+          .height(container.clientHeight);
+      } catch (err) {
+        console.error("GlobeView: failed to initialize globe.gl", err);
+        return;
+      }
       onReadyRef.current?.(globe);
     });
 
@@ -38,7 +49,7 @@ export function GlobeView({ onReady }: GlobeViewProps) {
       const { width, height } = entry.contentRect;
       globe?.width(width).height(height);
     });
-    resizeObserver.observe(container);
+    resizeObserver.observe(containerRef.current);
 
     return () => {
       cancelled = true;

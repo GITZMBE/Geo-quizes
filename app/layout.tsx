@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Geo Quiz",
+  title: "Geo Quizzes",
   description: "Test your geography knowledge with interactive map quizzes.",
 };
 

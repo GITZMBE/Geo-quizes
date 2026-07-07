@@ -1,4 +1,4 @@
-// Prisma schema — Geo Quiz
+// Prisma schema — Geo Quizzes
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {

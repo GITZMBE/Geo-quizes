@@ -1,4 +1,4 @@
-# Geo Quiz
+# Geo Quizzes
 
 Interactive geography quiz app. Sign in with Google to play map-based quizzes and climb the leaderboards.
 

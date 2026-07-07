@@ -23,10 +23,21 @@ agent working in this repo needs to know.
   `next/dynamic(() => import(...), { ssr: false })`. Follow this pattern for
   any new game page — see `app/games/stockholm-stadsdelar/page.tsx` /
   `StockholmGame.tsx` for the reference split.
-- **Prisma uses the new `prisma-client` generator** (not `prisma-client-js`),
-  output to `app/generated/prisma/`. Import from
-  `@/app/generated/prisma/client`, not `@prisma/client` directly.
-  `prisma.config.ts` (not the `package.json` `prisma` key) drives the CLI.
+- **Prisma uses `prisma-client-js` with `engineType = "client"`**, output to
+  `app/generated/prisma/`. Import from `@/app/generated/prisma`, not
+  `@prisma/client` directly. `lib/prisma.ts` constructs the client with
+  `@prisma/adapter-neon` (connects over HTTP/WebSocket, not a direct TCP
+  connection) — there is **no native query-engine binary** to bundle, which
+  is what makes this work inside a Netlify Function at all. Two things that
+  look like reasonable fixes but are dead ends, already tried:
+  - The newer `prisma-client` TS generator doesn't implement the `adapter`
+    option at all (prisma/prisma#28073).
+  - Passing `{ adapter }` to `PrismaClient` with `prisma-client-js` but
+    *without* `engineType = "client"` silently does nothing — it still loads
+    the native library engine. Verify any future Prisma changes by removing
+    the local `query_engine-windows.dll.node` and confirming queries still
+    work; if they don't, the adapter isn't actually being used.
+  - `prisma.config.ts` (not the `package.json` `prisma` key) drives the CLI.
 - **React 19's stricter effect-rules lint** (`react-hooks/set-state-in-effect`,
   `react-hooks/refs`) will fail CI-equivalent checks if you call `setState`
   synchronously in an effect body (do it inside a `.then`/callback instead) or
@@ -88,6 +99,11 @@ names; see the file's `note` field.
   `DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL` are set as env vars.
   `netlify.toml` build command runs `prisma migrate deploy && prisma generate`
   before `next build`, so schema migrations apply automatically each deploy.
+  **Verified live and working** (`/api/games/*/leaderboard` returns 200,
+  login redirect gating works, `/api/auth/session` clean) as of the
+  `@prisma/adapter-neon` + `engineType = "client"` fix — this took several
+  deploy cycles to get right, see the Prisma bullet above for the two dead
+  ends already ruled out.
 - **Google OAuth**: `AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET` are intentionally
   unset (pending). Login will not work anywhere — locally or deployed — until
   these are created in Google Cloud Console and set both locally and on

@@ -67,8 +67,7 @@ for (const c of cities) {
   deduped.push(c);
 }
 
-const TOP_N = 120;
-const top = deduped.slice(0, TOP_N).map((c, i) => ({
+const top = deduped.map((c, i) => ({
   id: c.geonameid,
   rank: i + 1,
   name: c.name,
@@ -82,7 +81,7 @@ const out = {
   kind: "points",
   source:
     "GeoNames cities15000 dump (download.geonames.org/export/dump/cities15000.zip), filtered to feature class P and sorted by population descending.",
-  note: `Top ${TOP_N} most populous cities worldwide by GeoNames population figures.`,
+  note: `All ${top.length} populated places worldwide with population > 15000, per the GeoNames cities15000 dump, for maximum variety in the game.`,
   items: top,
 };
 

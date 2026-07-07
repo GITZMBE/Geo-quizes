@@ -39,6 +39,21 @@ and gotchas an agent working in this repo needs to know.
   any new per-component game state; there's no cross-component sharing
   currently, so plain nanostores atoms (not computed/derived stores) are
   the right level of complexity.
+- **`GlobeView` (`components/GlobeView.tsx`) wraps `react-globe.gl`, not raw
+  `globe.gl`.** An earlier version hand-rolled globe.gl's imperative Kapsule
+  API directly (manual container ref, `new Globe(container)` in a
+  `useEffect`, imperative `.polygonsData()`/`.onPointClick()`/etc. chains) and
+  hit two rounds of real DOM-lifecycle crashes (`domNode.innerHTML = ""`
+  throwing because the container was null/detached — confirmed both times by
+  decompiling the actual crashing chunk, not guessed). `react-globe.gl` (same
+  author, maintained React binding) handles all of that correctly — **pass
+  layer data as props** (`polygonsData`, `pointColor`, `onPolygonClick`,
+  `onGlobeClick`, etc., driven by component state/props) rather than calling
+  methods imperatively on an instance. Use the forwarded `ref`
+  (`useRef<GlobeMethods>(null)`) only for the couple of ref-only methods:
+  `pointOfView()` and `controls()` (to set `enableRotate = false`). See
+  `StockholmGame.tsx` / `ClickDotMode.tsx` / `ProximityMode.tsx` for the
+  pattern. Don't reintroduce a manual globe.gl wrapper.
 - **Prisma uses `prisma-client-js` with `engineType = "client"`**, output to
   `app/generated/prisma/`. Import from `@/app/generated/prisma`, not
   `@prisma/client` directly. `lib/prisma.ts` constructs the client with

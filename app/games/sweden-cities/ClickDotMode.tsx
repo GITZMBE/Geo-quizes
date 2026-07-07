@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import type { GlobeMethods } from "react-globe.gl";
 import { useGameState } from "@/lib/state/useGameState";
-import type { GlobeInstance } from "globe.gl";
 import { GlobeView } from "@/components/GlobeView";
 import { Leaderboard } from "@/components/Leaderboard";
 import { swedenClickDotState } from "@/lib/state/gameAtoms";
@@ -17,7 +17,7 @@ const mode = game.modes.find((m) => m.slug === "click-dot")!;
 const SWEDEN_VIEW = { lat: 62.5, lng: 16.5, altitude: 1.1 };
 
 export function ClickDotMode({ cities }: { cities: City[] }) {
-  const [globe, setGlobe] = useState<GlobeInstance | null>(null);
+  const globeRef = useRef<GlobeMethods>(null);
   const [state, setState] = useGameState(swedenClickDotState);
   const submittedRef = useRef(false);
 
@@ -37,48 +37,28 @@ export function ClickDotMode({ cities }: { cities: City[] }) {
   }, [cities, state.order.length, setState]);
 
   useEffect(() => {
-    if (!globe || cities.length === 0) return;
-    globe
-      .pointAltitude(0.01)
-      .pointRadius(0.35)
-      .pointLabel((p) => (p as City).name)
-      .pointsData(cities)
-      .pointOfView(SWEDEN_VIEW, 0);
-    globe.controls().enableRotate = false;
-  }, [globe, cities]);
+    if (cities.length === 0) return;
+    globeRef.current?.pointOfView(SWEDEN_VIEW, 0);
+    const controls = globeRef.current?.controls();
+    if (controls) controls.enableRotate = false;
+  }, [cities.length]);
 
   const target = byRank.get(state.order[state.index]);
 
-  useEffect(() => {
-    if (!globe) return;
-    globe.pointColor((p) => {
-      const city = p as City;
-      if (state.lastResult) {
-        if (city.rank === target?.rank) return "#16a34a";
-        if (city.rank === state.lastClicked && state.lastResult === "wrong") return "#dc2626";
-      }
-      return "#2563eb";
+  function handlePointClick(point: object) {
+    const clicked = point as City;
+    setState((prev) => {
+      if (prev.finished || prev.lastResult) return prev;
+      const currentTarget = byRank.get(prev.order[prev.index]);
+      const correct = clicked.rank === currentTarget?.rank;
+      return {
+        ...prev,
+        lastClicked: clicked.rank,
+        lastResult: correct ? "correct" : "wrong",
+        score: correct ? prev.score + 1 : prev.score,
+      };
     });
-  }, [globe, target, state.lastClicked, state.lastResult]);
-
-  useEffect(() => {
-    if (!globe) return;
-    globe.onPointClick((point) => {
-      const clicked = point as City;
-      setState((prev) => {
-        if (prev.finished || prev.lastResult) return prev;
-        const currentTarget = byRank.get(prev.order[prev.index]);
-        const correct = clicked.rank === currentTarget?.rank;
-        return {
-          ...prev,
-          lastClicked: clicked.rank,
-          lastResult: correct ? "correct" : "wrong",
-          score: correct ? prev.score + 1 : prev.score,
-        };
-      });
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globe, setState]);
+  }
 
   useEffect(() => {
     if (!state.lastResult) return;
@@ -134,7 +114,24 @@ export function ClickDotMode({ cities }: { cities: City[] }) {
             </span>
           </div>
           <div className="flex-1 rounded-lg border border-border overflow-hidden">
-            <GlobeView onReady={setGlobe} />
+            <GlobeView
+              ref={globeRef}
+              pointsData={cities}
+              pointAltitude={0.01}
+              pointRadius={0.35}
+              pointLabel={(p) => (p as City).name}
+              pointColor={(p) => {
+                const city = p as City;
+                if (state.lastResult) {
+                  if (city.rank === target?.rank) return "#16a34a";
+                  if (city.rank === state.lastClicked && state.lastResult === "wrong") {
+                    return "#dc2626";
+                  }
+                }
+                return "#2563eb";
+              }}
+              onPointClick={handlePointClick}
+            />
           </div>
         </>
       ) : (

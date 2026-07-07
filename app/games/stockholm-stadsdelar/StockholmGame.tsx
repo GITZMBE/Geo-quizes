@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { GlobeMethods } from "react-globe.gl";
 import { useGameState } from "@/lib/state/useGameState";
-import type { GlobeInstance } from "globe.gl";
 import { GlobeView } from "@/components/GlobeView";
 import { Leaderboard } from "@/components/Leaderboard";
 import { stockholmGameState } from "@/lib/state/gameAtoms";
@@ -17,7 +17,7 @@ const mode = game.modes[0];
 const STOCKHOLM_VIEW = { lat: 59.32, lng: 18.06, altitude: 0.35 };
 
 export default function StockholmGame() {
-  const [globe, setGlobe] = useState<GlobeInstance | null>(null);
+  const globeRef = useRef<GlobeMethods>(null);
   const [districts, setDistricts] = useState<DistrictFeature[] | null>(null);
   const [state, setState] = useGameState(stockholmGameState);
   const submittedRef = useRef(false);
@@ -37,54 +37,30 @@ export default function StockholmGame() {
     });
   }, [setState]);
 
-  // Configure the globe once it's ready and districts have loaded.
+  // Lock the camera once the globe + districts are ready.
   useEffect(() => {
-    if (!globe || !districts) return;
-    globe
-      .polygonAltitude(0.008)
-      .polygonSideColor(() => "rgba(15, 23, 42, 0.1)")
-      .polygonStrokeColor(() => "#0f172a")
-      .polygonLabel((f) => (f as DistrictFeature).properties.name)
-      .pointOfView(STOCKHOLM_VIEW, 0);
-    globe.controls().enableRotate = false;
-    globe.polygonsData(districts);
-  }, [globe, districts]);
+    if (!districts) return;
+    globeRef.current?.pointOfView(STOCKHOLM_VIEW, 0);
+    const controls = globeRef.current?.controls();
+    if (controls) controls.enableRotate = false;
+  }, [districts]);
 
   const target = state.order[state.index];
 
-  // Recolor polygons to reflect the current target / last answer.
-  useEffect(() => {
-    if (!globe || !districts) return;
-    globe.polygonCapColor((f) => {
-      const name = (f as DistrictFeature).properties.name;
-      if (state.lastResult) {
-        if (name === target) return "rgba(22, 163, 74, 0.75)";
-        if (name === state.lastClicked && state.lastResult === "wrong") {
-          return "rgba(220, 38, 38, 0.75)";
-        }
-      }
-      return "rgba(37, 99, 235, 0.15)";
+  function handlePolygonClick(polygon: object) {
+    const clickedName = (polygon as DistrictFeature).properties.name;
+    setState((prev) => {
+      if (prev.finished || prev.lastResult) return prev;
+      const currentTarget = prev.order[prev.index];
+      const correct = clickedName === currentTarget;
+      return {
+        ...prev,
+        lastClicked: clickedName,
+        lastResult: correct ? "correct" : "wrong",
+        score: correct ? prev.score + 1 : prev.score,
+      };
     });
-  }, [globe, districts, target, state.lastClicked, state.lastResult]);
-
-  // Handle polygon clicks.
-  useEffect(() => {
-    if (!globe) return;
-    globe.onPolygonClick((polygon) => {
-      const clickedName = (polygon as DistrictFeature).properties.name;
-      setState((prev) => {
-        if (prev.finished || prev.lastResult) return prev;
-        const currentTarget = prev.order[prev.index];
-        const correct = clickedName === currentTarget;
-        return {
-          ...prev,
-          lastClicked: clickedName,
-          lastResult: correct ? "correct" : "wrong",
-          score: correct ? prev.score + 1 : prev.score,
-        };
-      });
-    });
-  }, [globe, setState]);
+  }
 
   // After showing feedback briefly, advance to the next round (or finish).
   useEffect(() => {
@@ -153,7 +129,27 @@ export default function StockholmGame() {
           </div>
 
           <div className="flex-1 rounded-lg border border-border overflow-hidden">
-            <GlobeView onReady={setGlobe} />
+            {districts && (
+              <GlobeView
+                ref={globeRef}
+                polygonsData={districts}
+                polygonAltitude={0.008}
+                polygonSideColor={() => "rgba(15, 23, 42, 0.1)"}
+                polygonStrokeColor={() => "#0f172a"}
+                polygonLabel={(f) => (f as DistrictFeature).properties.name}
+                polygonCapColor={(f) => {
+                  const name = (f as DistrictFeature).properties.name;
+                  if (state.lastResult) {
+                    if (name === target) return "rgba(22, 163, 74, 0.75)";
+                    if (name === state.lastClicked && state.lastResult === "wrong") {
+                      return "rgba(220, 38, 38, 0.75)";
+                    }
+                  }
+                  return "rgba(37, 99, 235, 0.15)";
+                }}
+                onPolygonClick={handlePolygonClick}
+              />
+            )}
           </div>
         </>
       ) : (

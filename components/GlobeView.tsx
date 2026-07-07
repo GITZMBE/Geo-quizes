@@ -1,54 +1,49 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import Globe, { type GlobeInstance } from "globe.gl";
+import { forwardRef, useEffect, useRef, useState, type MutableRefObject } from "react";
+import ReactGlobe, { type GlobeMethods, type GlobeProps } from "react-globe.gl";
 
-type GlobeViewProps = {
-  onReady?: (globe: GlobeInstance) => void;
-};
-
-// Thin wrapper around globe.gl (not a React component itself) — mounts a globe
-// into `containerRef` and hands the controller instance back via onReady so
-// game pages can configure polygons/points/click handlers as needed.
-//
-// globe.gl is imported statically (not via a nested dynamic import) — this
-// component is only ever rendered from inside StockholmGame/ClickDotMode/
-// ProximityMode, which are themselves loaded via next/dynamic({ssr:false}),
-// so SSR safety is already handled at that level. An earlier version did a
-// nested `import("globe.gl")` here, which opened a window between mount and
-// the import resolving during which the container could unmount (e.g. the
-// user switching game mode tabs) — globe.gl's init() unconditionally does
-// `domNode.innerHTML = ""`, which throws on a null/detached node. A static
-// import makes construction synchronous within the effect, closing that gap.
-export function GlobeView({ onReady }: GlobeViewProps) {
+// Thin sizing wrapper around react-globe.gl — the maintained React binding
+// for globe.gl. An earlier version hand-rolled globe.gl's imperative
+// Kapsule API directly (manual container ref + `new Globe(container)` in a
+// useEffect), which hit repeated DOM-lifecycle races (constructing against a
+// container that was null/detached). react-globe.gl handles all of that
+// correctly internally — pass layer data/config as props (polygonsData,
+// pointColor, onPolygonClick, etc.) instead of calling methods imperatively;
+// use the forwarded ref only for the few ref-only methods (pointOfView,
+// controls()).
+export const GlobeView = forwardRef<GlobeMethods, GlobeProps>(function GlobeView(props, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const onReadyRef = useRef(onReady);
-
-  useEffect(() => {
-    onReadyRef.current = onReady;
-  }, [onReady]);
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const globe = new Globe(container)
-      .backgroundColor("rgba(0,0,0,0)")
-      .width(container.clientWidth)
-      .height(container.clientHeight);
-    onReadyRef.current?.(globe);
-
     const resizeObserver = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
-      globe.width(width).height(height);
+      setSize({ width, height });
     });
     resizeObserver.observe(container);
 
-    return () => {
-      resizeObserver.disconnect();
-      globe._destructor?.();
-    };
+    return () => resizeObserver.disconnect();
   }, []);
 
-  return <div ref={containerRef} className="h-full w-full" />;
-}
+  return (
+    <div ref={containerRef} className="h-full w-full">
+      {size.width > 0 && size.height > 0 && (
+        <ReactGlobe
+          // react-globe.gl's own .d.ts types its ref as MutableRefObject
+          // rather than the standard React.Ref shape forwardRef provides;
+          // every consumer here only ever passes a plain useRef(null), so
+          // this cast reflects the actual (narrower) usage safely.
+          ref={ref as MutableRefObject<GlobeMethods | undefined> | undefined}
+          width={size.width}
+          height={size.height}
+          backgroundColor="rgba(0,0,0,0)"
+          {...props}
+        />
+      )}
+    </div>
+  );
+});

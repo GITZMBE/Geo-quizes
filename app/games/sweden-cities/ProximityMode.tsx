@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import type { GlobeMethods } from "react-globe.gl";
 import { useGameState } from "@/lib/state/useGameState";
-import type { GlobeInstance } from "globe.gl";
 import { GlobeView } from "@/components/GlobeView";
 import { Leaderboard } from "@/components/Leaderboard";
 import { swedenProximityState } from "@/lib/state/gameAtoms";
@@ -20,7 +20,7 @@ const SWEDEN_VIEW = { lat: 62.5, lng: 16.5, altitude: 1.1 };
 type MarkerPoint = { lat: number; lng: number; color: string };
 
 export function ProximityMode({ cities }: { cities: City[] }) {
-  const [globe, setGlobe] = useState<GlobeInstance | null>(null);
+  const globeRef = useRef<GlobeMethods>(null);
   const [state, setState] = useGameState(swedenProximityState);
   const submittedRef = useRef(false);
 
@@ -39,58 +39,44 @@ export function ProximityMode({ cities }: { cities: City[] }) {
   }, [cities, state.order.length, setState]);
 
   useEffect(() => {
-    if (!globe) return;
-    globe.pointOfView(SWEDEN_VIEW, 0);
-    globe.controls().enableRotate = false;
-  }, [globe]);
+    if (cities.length === 0) return;
+    globeRef.current?.pointOfView(SWEDEN_VIEW, 0);
+    const controls = globeRef.current?.controls();
+    if (controls) controls.enableRotate = false;
+  }, [cities.length]);
 
   const target = byRank.get(state.order[state.index]);
 
-  useEffect(() => {
-    if (!globe) return;
-    globe.onGlobeClick((coords) => {
-      setState((prev) => {
-        if (prev.finished || prev.lastGuess) return prev;
-        const currentTarget = byRank.get(prev.order[prev.index]);
-        if (!currentTarget) return prev;
-        const distanceKm = haversineDistanceKm(coords, currentTarget);
-        const points = proximityScore(distanceKm);
-        return { ...prev, lastGuess: { ...coords, distanceKm, points } };
-      });
+  function handleGlobeClick(coords: { lat: number; lng: number }) {
+    setState((prev) => {
+      if (prev.finished || prev.lastGuess) return prev;
+      const currentTarget = byRank.get(prev.order[prev.index]);
+      if (!currentTarget) return prev;
+      const distanceKm = haversineDistanceKm(coords, currentTarget);
+      const points = proximityScore(distanceKm);
+      return { ...prev, lastGuess: { ...coords, distanceKm, points } };
     });
-    // byRank is derived fresh from the stable `cities` prop each render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [globe, setState]);
+  }
 
-  useEffect(() => {
-    if (!globe) return;
-    const points: MarkerPoint[] = [];
-    if (state.lastGuess && target) {
-      points.push({ lat: state.lastGuess.lat, lng: state.lastGuess.lng, color: "#2563eb" });
-      points.push({ lat: target.lat, lng: target.lng, color: "#16a34a" });
-    }
-    globe
-      .pointsData(points)
-      .pointColor((p) => (p as MarkerPoint).color)
-      .pointAltitude(0.01)
-      .pointRadius(0.35)
-      .arcsData(
-        state.lastGuess && target
-          ? [
-              {
-                startLat: state.lastGuess.lat,
-                startLng: state.lastGuess.lng,
-                endLat: target.lat,
-                endLng: target.lng,
-              },
-            ]
-          : []
-      )
-      .arcColor(() => "#f59e0b")
-      .arcStroke(0.4)
-      .arcDashLength(1)
-      .arcDashGap(0);
-  }, [globe, state.lastGuess, target]);
+  const points: MarkerPoint[] =
+    state.lastGuess && target
+      ? [
+          { lat: state.lastGuess.lat, lng: state.lastGuess.lng, color: "#2563eb" },
+          { lat: target.lat, lng: target.lng, color: "#16a34a" },
+        ]
+      : [];
+
+  const arcs =
+    state.lastGuess && target
+      ? [
+          {
+            startLat: state.lastGuess.lat,
+            startLng: state.lastGuess.lng,
+            endLat: target.lat,
+            endLng: target.lng,
+          },
+        ]
+      : [];
 
   function nextRound() {
     setState((prev) => {
@@ -158,7 +144,19 @@ export function ProximityMode({ cities }: { cities: City[] }) {
             )}
           </div>
           <div className="flex-1 rounded-lg border border-border overflow-hidden">
-            <GlobeView onReady={setGlobe} />
+            <GlobeView
+              ref={globeRef}
+              pointsData={points}
+              pointColor={(p) => (p as MarkerPoint).color}
+              pointAltitude={0.01}
+              pointRadius={0.35}
+              arcsData={arcs}
+              arcColor={() => "#f59e0b"}
+              arcStroke={0.4}
+              arcDashLength={1}
+              arcDashGap={0}
+              onGlobeClick={handleGlobeClick}
+            />
           </div>
         </>
       ) : (

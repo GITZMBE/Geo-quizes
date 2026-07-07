@@ -121,12 +121,18 @@ higher is better; `TIME_MS` sorts ascending — faster is better) via
 Create `app/games/<slug>/page.tsx`. Patterns already established in this
 codebase to reuse rather than reinvent:
 
-- **Map/globe rendering**: `components/GlobeView.tsx` — a thin wrapper
-  around `globe.gl` that hands you the controller instance via `onReady`.
-  Configure it imperatively inside a `useEffect` (`.polygonsData()` /
-  `.pointsData()`, `.onPolygonClick()` / `.onPointClick()` /
-  `.onGlobeClick()`, `.pointOfView()`, and `globe.controls().enableRotate =
-  false` to lock it into "flat map" behavior for a country/region-scale quiz).
+- **Map/globe rendering**: `components/GlobeView.tsx` — a thin sizing wrapper
+  around `react-globe.gl` (not raw `globe.gl` — a hand-rolled imperative
+  wrapper was tried twice and hit real DOM-lifecycle crashes both times).
+  Pass layer data/config as **props** driven by component state
+  (`polygonsData`, `pointsData`, `pointColor`, `onPolygonClick`,
+  `onPointClick`, `onGlobeClick`, etc. — same names as globe.gl's chainable
+  methods, just as props instead). Use a forwarded `ref`
+  (`useRef<GlobeMethods>(null)`) only for the couple of ref-only methods:
+  `pointOfView()` for the initial camera, and `controls().enableRotate =
+  false` to lock it into "flat map" behavior for a country/region-scale quiz.
+  Don't call layer/data methods imperatively on the ref — that's what broke
+  last time.
 - **Per-game round state**: a `nanostores` atom in `lib/state/gameAtoms.ts`
   (order/index/score/lastResult/finished shape — copy the pattern from
   `stockholmGameState` or `swedenClickDotState`), read via `useGameState`

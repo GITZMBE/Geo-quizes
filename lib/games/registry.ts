@@ -33,6 +33,14 @@ export const GAMES: GameDefinition[] = [
       { slug: "proximity", name: "Guess the location", scoreType: "POINTS" },
     ],
   },
+  {
+    slug: "world-cities",
+    name: "Five Cities Across the World",
+    description:
+      "Five of the world's biggest cities, one at a time — click where on the globe you think each one is.",
+    dataFile: "/data/world_largest_cities.json",
+    modes: [{ slug: "proximity", name: "Guess the location", scoreType: "POINTS" }],
+  },
 ];
 
 export function getGame(slug: string): GameDefinition | undefined {

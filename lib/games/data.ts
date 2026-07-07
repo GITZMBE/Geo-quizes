@@ -45,3 +45,13 @@ export type City = GamePoint & {
 export async function fetchCities(url: string): Promise<City[]> {
   return fetchPoints<City>(url);
 }
+
+export type WorldCity = GamePoint & {
+  rank: number;
+  population: number;
+  country: string;
+};
+
+export async function fetchWorldCities(url: string): Promise<WorldCity[]> {
+  return fetchPoints<WorldCity>(url);
+}

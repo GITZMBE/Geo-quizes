@@ -18,10 +18,12 @@ export function haversineDistanceKm(
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.sqrt(h));
 }
 
-// maptap.gg-style: full points within a small radius, decaying to 0 by ~600km.
-export function proximityScore(distanceKm: number) {
+// maptap.gg-style: full points within a small radius, decaying to 0 by
+// ~5x decayKm. Default (600km) suits a country-scale game like Sweden's
+// cities; a world-scale game should pass a much larger decayKm so a
+// right-continent guess still earns partial credit.
+export function proximityScore(distanceKm: number, decayKm = 600) {
   const maxPoints = 5000;
-  const decayKm = 600;
   return Math.round(maxPoints * Math.exp(-distanceKm / decayKm));
 }
 

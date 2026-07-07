@@ -34,3 +34,11 @@ export const swedenProximityState = atom({
   lastGuess: null as { lat: number; lng: number; distanceKm: number; points: number } | null,
   finished: false,
 });
+
+export const worldProximityState = atom({
+  order: [] as string[],
+  index: 0,
+  totalScore: 0,
+  lastGuess: null as { lat: number; lng: number; distanceKm: number; points: number } | null,
+  finished: false,
+});

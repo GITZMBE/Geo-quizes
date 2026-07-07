@@ -113,6 +113,19 @@ GeoNames Sweden dump and matched programmatically (`scripts/match-city-coords.js
 coordinates since no exact GeoNames entry exists for those SCB locality
 names; see the file's `note` field.
 
+3. **Five Cities Across the World** (`/games/world-cities`) — one mode,
+   *Guess the location*: 5 random cities from the top 120 most populous
+   cities worldwide, click your guess on the freely-rotatable globe; POINTS,
+   scored by distance via `proximityScore(distanceKm, decayKm)` — this game
+   passes a much larger `decayKm` (3000, vs. the 600 default tuned for
+   Sweden's country-scale game) so a right-continent guess still earns
+   partial credit at world scale.
+
+`public/data/world_largest_cities.json` coordinates and populations come
+from GeoNames' worldwide `cities15000` dump, filtered to feature class `P`
+and sorted by population (`scripts/build-world-cities.js`) — no per-item
+proxying needed, unlike the Sweden data.
+
 ## Infra / deployment status
 
 - **GitHub**: `https://github.com/GITZMBE/Geo-quizzes.git` (repo has been

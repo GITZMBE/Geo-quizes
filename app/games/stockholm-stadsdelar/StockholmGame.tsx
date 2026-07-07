@@ -23,8 +23,13 @@ export default function StockholmGame() {
   const [state, setState] = useGameState(stockholmGameState);
   const submittedRef = useRef(false);
 
-  // Load district borders + start a fresh shuffled run on mount.
+  // Load district borders + start a fresh shuffled run on mount. Guarded on
+  // `districts` (not just the dependency array) — useGameState's setState
+  // is a new function identity every render, so an unguarded effect here
+  // would refetch and reshuffle on every render it causes, one after
+  // another, endlessly changing the current target.
   useEffect(() => {
+    if (districts) return;
     fetchDistricts(game.dataFile).then((features) => {
       setDistricts(features);
       setState({
@@ -36,7 +41,7 @@ export default function StockholmGame() {
         finished: false,
       });
     });
-  }, [setState]);
+  }, [districts, setState]);
 
   // Lock the camera once the globe + districts are ready. Gated on
   // globeReady (react-globe.gl's onGlobeReady), not just `districts` —

@@ -55,3 +55,26 @@ export type WorldCity = GamePoint & {
 export async function fetchWorldCities(url: string): Promise<WorldCity[]> {
   return fetchPoints<WorldCity>(url);
 }
+
+export type WorldCountry = GamePoint & {
+  rank: number;
+  continent: string;
+  capital: string;
+  flagUrl: string;
+};
+
+export async function fetchWorldCountries(url: string): Promise<WorldCountry[]> {
+  return fetchPoints<WorldCountry>(url);
+}
+
+export type CountryFeature = RegionFeature & {
+  properties: { name: string; iso2: string; capital: string; flagUrl: string };
+};
+
+// Same wire format as fetchRegions (plain GeoJSON) — CountryFeature only
+// adds extra properties fields, so this just re-fetches and widens the type
+// rather than reimplementing the fetch.
+export async function fetchCountryRegions(url: string): Promise<CountryFeature[]> {
+  const features = await fetchRegions(url);
+  return features as CountryFeature[];
+}

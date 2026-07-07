@@ -51,3 +51,45 @@ export const usStatesGameState = atom({
   lastResult: null as RoundResult,
   finished: false,
 });
+
+export const worldCountriesTypeAllState = atom({
+  guessedIds: [] as string[],
+  startedAt: null as number | null,
+  finishedAt: null as number | null,
+  gaveUp: false,
+});
+
+export type RoundGameState = {
+  order: string[];
+  index: number;
+  score: number;
+  lastAnswer: string | null;
+  lastResult: RoundResult;
+  finished: boolean;
+};
+
+const DEFAULT_ROUND_STATE: RoundGameState = {
+  order: [],
+  index: 0,
+  score: 0,
+  lastAnswer: null,
+  lastResult: null,
+  finished: false,
+};
+
+// The per-continent Countries/Capitals/Flags modes (see useRoundGame.ts)
+// are 18 independent instances (6 continents x 3 modes) of the exact same
+// round shape already used by stockholmGameState/usStatesGameState above —
+// a factory + cache avoids hand-declaring 18 near-identical exports here,
+// while still giving each game+mode its own persistent atom (so switching
+// mode tabs and back doesn't lose progress, same as the hand-declared ones).
+const roundStateCache = new Map<string, ReturnType<typeof atom<RoundGameState>>>();
+
+export function getRoundState(key: string) {
+  let state = roundStateCache.get(key);
+  if (!state) {
+    state = atom({ ...DEFAULT_ROUND_STATE });
+    roundStateCache.set(key, state);
+  }
+  return state;
+}

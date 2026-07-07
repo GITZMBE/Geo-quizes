@@ -1,0 +1,88 @@
+"use client";
+
+import { MapView } from "@/components/MapView";
+import { Leaderboard } from "@/components/Leaderboard";
+import type { CountryFeature } from "@/lib/games/data";
+import { useRoundGame } from "@/lib/games/useRoundGame";
+
+export function CountriesMapMode({
+  gameSlug,
+  countries,
+  projection,
+}: {
+  gameSlug: string;
+  countries: CountryFeature[];
+  projection?: "mercator" | "albersUsa" | "pacific";
+}) {
+  const { game, mode, state, target, submitGuess, playAgain } = useRoundGame({
+    gameSlug,
+    modeSlug: "countries",
+    items: countries,
+    getId: (c) => c.properties.name,
+  });
+
+  function handleRegionClick(feature: CountryFeature) {
+    submitGuess(feature.properties.name, feature.properties.name === target);
+  }
+
+  return (
+    <div className="flex flex-1 flex-col gap-4">
+      {!state.finished ? (
+        <>
+          <div
+            className={`rounded-lg border p-4 text-center text-lg font-medium transition-colors ${
+              state.lastResult === "correct"
+                ? "border-success bg-success/10 text-success"
+                : state.lastResult === "wrong"
+                  ? "border-error bg-error/10 text-error"
+                  : "border-border bg-surface"
+            }`}
+          >
+            Click on: <span className="font-bold">{target}</span>
+            <span className="ml-3 text-sm text-muted-foreground">
+              ({state.index + 1}/{state.order.length}) · Score: {state.score}
+            </span>
+          </div>
+
+          <div className="relative flex-1 rounded-lg border border-border overflow-hidden">
+            <MapView
+              regionsData={countries}
+              projection={projection}
+              label={(f) => f.properties.name}
+              stroke={() => "#0f172a"}
+              fill={(f) => {
+                const name = f.properties.name;
+                if (state.lastResult) {
+                  if (name === target) return "rgba(22, 163, 74, 0.75)";
+                  if (name === state.lastAnswer && state.lastResult === "wrong") {
+                    return "rgba(220, 38, 38, 0.75)";
+                  }
+                }
+                return "rgba(37, 99, 235, 0.15)";
+              }}
+              onRegionClick={handleRegionClick}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-1 flex-col items-center justify-center gap-6">
+          <div className="text-center">
+            <p className="text-4xl font-bold">
+              {state.score} / {state.order.length}
+            </p>
+            <p className="text-muted-foreground">Countries correctly identified</p>
+          </div>
+          <button
+            onClick={playAgain}
+            className="rounded-md bg-primary px-6 py-3 font-medium text-primary-foreground hover:opacity-90"
+          >
+            Play again
+          </button>
+          <div className="w-full max-w-sm">
+            <Leaderboard key={String(state.finished)} gameSlug={game.slug} mode={mode} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

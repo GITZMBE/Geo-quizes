@@ -53,6 +53,38 @@ function clampScale(k: number) {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, k));
 }
 
+// geoAlbersUsa's internal clipExtent leaks a full-canvas rectangle into the
+// start of every feature's "d" string (confirmed: all 50 US states have it,
+// not just a few). That's invisible when a whole country/state collection
+// is merged into one <path> with one fill — the rectangle's winding cancels
+// against its neighbors — but every region here is its own <path> (needed
+// for independent per-region click/fill), so the leaked rectangle renders
+// as a full-viewport fill on its own: with the default nonzero fill rule
+// every region's rectangle fills the whole map solid; under evenodd (needed
+// for Canada's multi-ring Arctic islands, see the fillRule comment below)
+// each region's rectangle fills solid *except* a hole punched at that
+// region's own shape — confirmed by clicking a wrong US state and watching
+// the entire map flash solid red. The rectangle is always the first
+// subpath and always a simple axis-aligned box (4 points + close), so it's
+// safe to strip structurally rather than special-case by projection.
+// Not just leading — for a MultiPolygon under albersUsa (Alaska, Hawaii),
+// a clip rectangle gets re-inserted as its own subpath between *each* real
+// island ring, apparently once per transition across the composite
+// projection's 3 sub-region boundaries (confirmed: Alaska's 4 real island
+// subpaths are interleaved with rectangle subpaths for all 3 of the main
+// map's extent, Hawaii's inset box, and Alaska's own inset box — 7 of
+// Alaska's 10 total subpaths are these rectangles). So this splits into
+// subpaths and drops every one that's exactly a closed axis-aligned
+// rectangle, rather than only stripping a leading run of them.
+const CLIP_RECTANGLE = /^M(-?[\d.]+),(-?[\d.]+)L(-?[\d.]+),\2L\3,(-?[\d.]+)L\1,\4Z$/;
+function stripClipRectangle(d: string | null): string | undefined {
+  if (!d) return undefined;
+  return d
+    .split(/(?=M)/)
+    .filter((subpath) => !CLIP_RECTANGLE.test(subpath))
+    .join("");
+}
+
 export function MapView<T extends RegionFeature>({
   regionsData,
   projection = "mercator",
@@ -67,6 +99,13 @@ export function MapView<T extends RegionFeature>({
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(
     null
   );
+  // Every currently-down pointer, keyed by pointerId — a single entry is a
+  // drag-to-pan (only once already zoomed, same as before); two entries is
+  // a pinch, recomputed incrementally each move from the previous frame's
+  // distance/midpoint rather than a single gesture-start reference, so a
+  // pinch that also drifts sideways pans and zooms together naturally.
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchRef = useRef<{ distance: number } | null>(null);
 
   // A previous round's zoom/pan shouldn't carry over onto a different
   // region set (new game, or a fresh shuffle) — reset whenever the data
@@ -152,7 +191,25 @@ export function MapView<T extends RegionFeature>({
   }
 
   function handlePointerDown(e: PointerEvent<SVGSVGElement>) {
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointersRef.current.size === 2) {
+      // A second finger just landed — cancel any single-finger pan and
+      // switch to pinch mode instead.
+      dragRef.current = null;
+      const [a, b] = [...pointersRef.current.values()];
+      pinchRef.current = { distance: Math.hypot(a.x - b.x, a.y - b.y) };
+      return;
+    }
+    if (pointersRef.current.size > 2) return;
+
     if (transform.k <= 1) return;
+    // Only capture the pointer once a drag (already zoomed) or pinch is
+    // actually starting, not on every pointerdown — capturing
+    // unconditionally retargeted the browser's synthesized "click" away
+    // from the individual region <path> under the finger/cursor, breaking
+    // click-to-guess entirely even at the default (unzoomed) scale.
+    e.currentTarget.setPointerCapture(e.pointerId);
     dragRef.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
@@ -160,10 +217,24 @@ export function MapView<T extends RegionFeature>({
       originX: transform.x,
       originY: transform.y,
     };
-    e.currentTarget.setPointerCapture(e.pointerId);
   }
 
   function handlePointerMove(e: PointerEvent<SVGSVGElement>) {
+    if (!pointersRef.current.has(e.pointerId)) return;
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pointersRef.current.size === 2 && pinchRef.current) {
+      const [a, b] = [...pointersRef.current.values()];
+      const rect = e.currentTarget.getBoundingClientRect();
+      const distance = Math.hypot(a.x - b.x, a.y - b.y);
+      const midX = (a.x + b.x) / 2 - rect.left;
+      const midY = (a.y + b.y) / 2 - rect.top;
+      const scaleFactor = distance / pinchRef.current.distance;
+      zoomBy(scaleFactor, { x: midX, y: midY });
+      pinchRef.current = { distance };
+      return;
+    }
+
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== e.pointerId) return;
     setTransform((prev) => ({
@@ -174,8 +245,9 @@ export function MapView<T extends RegionFeature>({
   }
 
   function endDrag(e: PointerEvent<SVGSVGElement>) {
-    if (dragRef.current?.pointerId !== e.pointerId) return;
-    dragRef.current = null;
+    pointersRef.current.delete(e.pointerId);
+    if (pointersRef.current.size < 2) pinchRef.current = null;
+    if (dragRef.current?.pointerId === e.pointerId) dragRef.current = null;
     e.currentTarget.releasePointerCapture(e.pointerId);
   }
 
@@ -200,7 +272,7 @@ export function MapView<T extends RegionFeature>({
               {regionsData.map((feature, i) => (
                 <path
                   key={i}
-                  d={pathFor(feature as unknown as GeoPermissibleObjects) ?? undefined}
+                  d={stripClipRectangle(pathFor(feature as unknown as GeoPermissibleObjects))}
                   fill={fill(feature)}
                   // evenodd, not the SVG default nonzero: a MultiPolygon whose
                   // separate (disjoint, non-nested) rings don't all share the

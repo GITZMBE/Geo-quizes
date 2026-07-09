@@ -126,8 +126,12 @@ export function WorldProximityMode({ cities }: { cities: WorldCity[] }) {
   return (
     <div className="flex flex-1 flex-col gap-4">
       {!state.finished ? (
-        <>
-          <div className="rounded-lg border border-border bg-surface p-4 text-center">
+        <div
+          ref={mapContainerRef}
+          className="relative flex-1 overflow-hidden rounded-lg border border-border [&:fullscreen]:bg-background"
+        >
+          <FullscreenButton targetRef={mapContainerRef} autoEnter />
+          <div className="absolute inset-x-3 top-3 z-10 mx-auto max-w-lg rounded-lg border border-border bg-surface/95 p-4 text-center shadow-sm backdrop-blur-sm">
             {!state.lastGuess ? (
               <>
                 <span className="text-lg font-medium">
@@ -156,27 +160,21 @@ export function WorldProximityMode({ cities }: { cities: WorldCity[] }) {
               </div>
             )}
           </div>
-          <div
-            ref={mapContainerRef}
-            className="relative flex-1 overflow-hidden rounded-lg border border-border [&:fullscreen]:bg-background"
-          >
-            <FullscreenButton targetRef={mapContainerRef} />
-            <GlobeView
-              ref={globeRef}
-              onGlobeReady={() => setGlobeReady(true)}
-              pointsData={points}
-              pointColor={(p) => (p as MarkerPoint).color}
-              pointAltitude={0.01}
-              pointRadius={0.35}
-              arcsData={arcs}
-              arcColor={() => "#f59e0b"}
-              arcStroke={0.4}
-              arcDashLength={1}
-              arcDashGap={0}
-              onGlobeClick={handleGlobeClick}
-            />
-          </div>
-        </>
+          <GlobeView
+            ref={globeRef}
+            onGlobeReady={() => setGlobeReady(true)}
+            pointsData={points}
+            pointColor={(p) => (p as MarkerPoint).color}
+            pointAltitude={0.01}
+            pointRadius={0.35}
+            arcsData={arcs}
+            arcColor={() => "#f59e0b"}
+            arcStroke={0.4}
+            arcDashLength={1}
+            arcDashGap={0}
+            onGlobeClick={handleGlobeClick}
+          />
+        </div>
       ) : (
         <div className="flex flex-1 flex-col items-center justify-center gap-6">
           <div className="text-center">

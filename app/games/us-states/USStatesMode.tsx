@@ -31,6 +31,8 @@ export function USStatesMode({ states }: { states: RegionFeature[] }) {
         score: 0,
         lastClicked: null,
         lastResult: null,
+        wrongGuesses: [],
+        correctGuesses: [],
         finished: false,
       });
     }
@@ -49,6 +51,14 @@ export function USStatesMode({ states }: { states: RegionFeature[] }) {
         lastClicked: clickedName,
         lastResult: correct ? "correct" : "wrong",
         score: correct ? prev.score + 1 : prev.score,
+        wrongGuesses:
+          !correct && !prev.wrongGuesses.includes(clickedName)
+            ? [...prev.wrongGuesses, clickedName]
+            : prev.wrongGuesses,
+        correctGuesses:
+          correct && !prev.correctGuesses.includes(clickedName)
+            ? [...prev.correctGuesses, clickedName]
+            : prev.correctGuesses,
       };
     });
   }
@@ -87,6 +97,8 @@ export function USStatesMode({ states }: { states: RegionFeature[] }) {
       score: 0,
       lastClicked: null,
       lastResult: null,
+      wrongGuesses: [],
+      correctGuesses: [],
       finished: false,
     });
   }
@@ -124,6 +136,11 @@ export function USStatesMode({ states }: { states: RegionFeature[] }) {
                     return "rgba(220, 38, 38, 0.75)";
                   }
                 }
+                // Once guessed, a state stays red/green for the rest of
+                // the game (not just this round's brief feedback) — a
+                // visual record of what's already been ruled out or found.
+                if (state.wrongGuesses.includes(name)) return "rgba(220, 38, 38, 0.45)";
+                if (state.correctGuesses.includes(name)) return "rgba(22, 163, 74, 0.45)";
                 return "rgba(37, 99, 235, 0.15)";
               }}
               onRegionClick={handlePolygonClick}

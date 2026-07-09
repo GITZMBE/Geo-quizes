@@ -58,6 +58,11 @@ export function CountriesMapMode({
                     return "rgba(220, 38, 38, 0.75)";
                   }
                 }
+                // Once guessed, a country stays red/green for the rest of
+                // the game (not just this round's brief feedback) — a
+                // visual record of what's already been ruled out or found.
+                if (state.wrongGuesses.includes(name)) return "rgba(220, 38, 38, 0.45)";
+                if (state.correctGuesses.includes(name)) return "rgba(22, 163, 74, 0.45)";
                 return "rgba(37, 99, 235, 0.15)";
               }}
               onRegionClick={handleRegionClick}

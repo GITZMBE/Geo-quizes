@@ -8,6 +8,14 @@ export const stockholmGameState = atom({
   score: 0,
   lastClicked: null as string | null,
   lastResult: null as RoundResult,
+  // Every wrongly-clicked district name so far this game, so a miss keeps
+  // showing red for the rest of the game rather than just the brief
+  // feedback window.
+  wrongGuesses: [] as string[],
+  // Every correctly-clicked district name so far this game, so a hit keeps
+  // showing green for the rest of the game rather than just the brief
+  // feedback window.
+  correctGuesses: [] as string[],
   finished: false,
 });
 
@@ -49,6 +57,14 @@ export const usStatesGameState = atom({
   score: 0,
   lastClicked: null as string | null,
   lastResult: null as RoundResult,
+  // Every wrongly-clicked state name so far this game, so a miss keeps
+  // showing red for the rest of the game rather than just the brief
+  // feedback window.
+  wrongGuesses: [] as string[],
+  // Every correctly-clicked state name so far this game, so a hit keeps
+  // showing green for the rest of the game rather than just the brief
+  // feedback window.
+  correctGuesses: [] as string[],
   finished: false,
 });
 
@@ -65,6 +81,13 @@ export type RoundGameState = {
   score: number;
   lastAnswer: string | null;
   lastResult: RoundResult;
+  // Every wrong answer so far this game (region name, capital, or country
+  // name depending on mode), so a miss keeps showing red for the rest of
+  // the game rather than just the brief feedback window.
+  wrongGuesses: string[];
+  // Every correct answer so far this game, so a hit keeps showing green
+  // for the rest of the game rather than just the brief feedback window.
+  correctGuesses: string[];
   finished: boolean;
 };
 
@@ -74,6 +97,8 @@ const DEFAULT_ROUND_STATE: RoundGameState = {
   score: 0,
   lastAnswer: null,
   lastResult: null,
+  wrongGuesses: [],
+  correctGuesses: [],
   finished: false,
 };
 

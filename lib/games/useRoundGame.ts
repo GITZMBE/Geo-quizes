@@ -39,6 +39,8 @@ export function useRoundGame<T>({
         score: 0,
         lastAnswer: null,
         lastResult: null,
+        wrongGuesses: [],
+        correctGuesses: [],
         finished: false,
       });
     }
@@ -75,6 +77,12 @@ export function useRoundGame<T>({
         lastAnswer: answer,
         lastResult: isCorrect ? "correct" : "wrong",
         score: isCorrect ? prev.score + 1 : prev.score,
+        wrongGuesses: !isCorrect && !prev.wrongGuesses.includes(answer)
+          ? [...prev.wrongGuesses, answer]
+          : prev.wrongGuesses,
+        correctGuesses: isCorrect && !prev.correctGuesses.includes(answer)
+          ? [...prev.correctGuesses, answer]
+          : prev.correctGuesses,
       };
     });
   }
@@ -87,6 +95,8 @@ export function useRoundGame<T>({
       score: 0,
       lastAnswer: null,
       lastResult: null,
+      wrongGuesses: [],
+      correctGuesses: [],
       finished: false,
     });
   }

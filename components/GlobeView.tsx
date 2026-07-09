@@ -21,12 +21,15 @@ import ReactGlobe, { type GlobeMethods, type GlobeProps } from "react-globe.gl";
 // nearest positioned ancestor's actual box instead, so callers just need
 // `relative` on that wrapper.
 // The globe's zoom floor (three-globe's default OrbitControls.minDistance
-// sits right at the surface) lets the camera get closer than the bundled
-// earth texture (a fixed-resolution raster, no higher-res variant) has
-// detail for — past this distance it stretches blurry across the viewport.
-// Raising the floor keeps zoom useful for gameplay without crossing into
-// that blur.
-const MIN_ZOOM_DISTANCE = 220;
+// sits right at the surface) lets the camera get closer than the earth
+// texture has detail for — past this distance it stretches blurry across
+// the viewport. Raising the floor keeps zoom useful for gameplay without
+// crossing into that blur. Self-hosted (not hotlinked) because NASA's
+// eoimages server doesn't send CORS headers, which three.js's TextureLoader
+// requires for WebGL — a bare cross-origin <img> works fine, but
+// texImage2D throws SecurityError without them.
+const MIN_ZOOM_DISTANCE = 170;
+const EARTH_TEXTURE_URL = "/textures/earth-blue-marble-5400.jpg";
 
 export const GlobeView = forwardRef<GlobeMethods, GlobeProps>(function GlobeView(props, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,7 +72,7 @@ export const GlobeView = forwardRef<GlobeMethods, GlobeProps>(function GlobeView
           // flat black (see defaultGlobeMaterial in three-globe/src/layers/globe.js)
           // — every caller here relies on this default rather than passing
           // its own, so it lives here instead of being repeated 3x.
-          globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
+          globeImageUrl={EARTH_TEXTURE_URL}
           {...props}
           onGlobeReady={handleGlobeReady}
         />

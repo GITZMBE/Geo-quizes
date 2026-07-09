@@ -6,6 +6,7 @@ import { useGameState } from "@/lib/state/useGameState";
 import { GlobeView } from "@/components/GlobeView";
 import { Leaderboard } from "@/components/Leaderboard";
 import { FullscreenButton } from "@/components/games/FullscreenButton";
+import { GameResultActions } from "@/components/games/GameResultActions";
 import { worldProximityState } from "@/lib/state/gameAtoms";
 import type { WorldCity } from "@/lib/games/data";
 import { haversineDistanceKm, proximityScore, shuffle } from "@/lib/games/geo";
@@ -181,12 +182,7 @@ export function WorldProximityMode({ cities }: { cities: WorldCity[] }) {
             <p className="text-4xl font-bold">{state.totalScore} pts</p>
             <p className="text-muted-foreground">Across {ROUNDS} rounds</p>
           </div>
-          <button
-            onClick={playAgain}
-            className="rounded-md bg-primary px-6 py-3 font-medium text-primary-foreground hover:opacity-90"
-          >
-            Play again
-          </button>
+          <GameResultActions onPlayAgain={playAgain} />
           <div className="w-full max-w-sm">
             <Leaderboard key={String(state.finished)} gameSlug={game.slug} mode={mode} />
           </div>

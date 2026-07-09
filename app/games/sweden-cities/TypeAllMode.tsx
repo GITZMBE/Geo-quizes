@@ -6,6 +6,7 @@ import { swedenTypeAllState } from "@/lib/state/gameAtoms";
 import type { City } from "@/lib/games/data";
 import { submitScore, formatScoreValue } from "@/lib/games/scores";
 import { Leaderboard } from "@/components/Leaderboard";
+import { GameResultActions } from "@/components/games/GameResultActions";
 import { getGame } from "@/lib/games/registry";
 
 const game = getGame("sweden-cities")!;
@@ -132,12 +133,7 @@ export function TypeAllMode({ cities }: { cities: City[] }) {
               ? `You named ${state.guessedRanks.length} / ${cities.length}`
               : `Completed in ${formatScoreValue("TIME_MS", elapsedMs)}!`}
           </p>
-          <button
-            onClick={playAgain}
-            className="rounded-md bg-primary px-6 py-3 font-medium text-primary-foreground hover:opacity-90"
-          >
-            Play again
-          </button>
+          <GameResultActions onPlayAgain={playAgain} />
           <div className="w-full max-w-sm">
             <Leaderboard key={String(finished)} gameSlug={game.slug} mode={mode} />
           </div>

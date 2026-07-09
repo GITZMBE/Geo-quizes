@@ -26,7 +26,7 @@ import ReactGlobe, { type GlobeMethods, type GlobeProps } from "react-globe.gl";
 // detail for — past this distance it stretches blurry across the viewport.
 // Raising the floor keeps zoom useful for gameplay without crossing into
 // that blur.
-const MIN_ZOOM_DISTANCE = 150;
+const MIN_ZOOM_DISTANCE = 220;
 
 export const GlobeView = forwardRef<GlobeMethods, GlobeProps>(function GlobeView(props, ref) {
   const containerRef = useRef<HTMLDivElement>(null);

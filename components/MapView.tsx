@@ -53,6 +53,24 @@ function clampScale(k: number) {
   return Math.min(MAX_SCALE, Math.max(MIN_SCALE, k));
 }
 
+// Bounds x/y so the content (roughly width*k by height*k, post-fitSize) never
+// pans past its own edges — panning was previously unbounded, so a drag
+// while zoomed in could push the translate arbitrarily far in any
+// direction; zooming back out afterward scaled that same stale offset down
+// proportionally (to keep the pinch/cursor point fixed) instead of
+// re-centering, so it never actually returned to 0 on its own. At k===1
+// (MIN_SCALE) this collapses to exactly {x: 0, y: 0} since minX/minY are 0
+// there, which is what re-anchors the map back to identity once zoomed
+// fully out, restoring the areas that had panned out of the viewport.
+function clampTranslate(x: number, y: number, k: number, width: number, height: number) {
+  const minX = width - width * k;
+  const minY = height - height * k;
+  return {
+    x: Math.min(0, Math.max(minX, x)),
+    y: Math.min(0, Math.max(minY, y)),
+  };
+}
+
 // geoAlbersUsa's internal clipExtent leaks a full-canvas rectangle into the
 // start of every feature's "d" string (confirmed: all 50 US states have it,
 // not just a few). That's invisible when a whole country/state collection
@@ -173,11 +191,9 @@ export function MapView<T extends RegionFeature>({
       const cy = center?.y ?? size.height / 2;
       // Keep the point under the cursor (or the container's center, for
       // button clicks) fixed on screen while scaling.
-      return {
-        k: nextK,
-        x: cx - ((cx - prev.x) / prev.k) * nextK,
-        y: cy - ((cy - prev.y) / prev.k) * nextK,
-      };
+      const rawX = cx - ((cx - prev.x) / prev.k) * nextK;
+      const rawY = cy - ((cy - prev.y) / prev.k) * nextK;
+      return { k: nextK, ...clampTranslate(rawX, rawY, nextK, size.width, size.height) };
     });
   }
 
@@ -239,8 +255,13 @@ export function MapView<T extends RegionFeature>({
     if (!drag || drag.pointerId !== e.pointerId) return;
     setTransform((prev) => ({
       ...prev,
-      x: drag.originX + (e.clientX - drag.startX),
-      y: drag.originY + (e.clientY - drag.startY),
+      ...clampTranslate(
+        drag.originX + (e.clientX - drag.startX),
+        drag.originY + (e.clientY - drag.startY),
+        prev.k,
+        size.width,
+        size.height
+      ),
     }));
   }
 

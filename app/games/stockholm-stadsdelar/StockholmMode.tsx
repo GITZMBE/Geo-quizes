@@ -52,13 +52,18 @@ export function StockholmMode({ districts }: { districts: DistrictFeature[] }) {
         lastClicked: clickedName,
         lastResult: correct ? "correct" : "wrong",
         score: correct ? prev.score + 1 : prev.score,
+        // Mark the round's target, not whatever was clicked — a wrong guess
+        // means the target has now been ruled out as "not this one either,"
+        // so it's the target that should stay red for the rest of the game
+        // (a wrong guess itself may well be the correct answer for a later
+        // round, and shouldn't be pre-emptively ruled out).
         wrongGuesses:
-          !correct && !prev.wrongGuesses.includes(clickedName)
-            ? [...prev.wrongGuesses, clickedName]
+          !correct && !prev.wrongGuesses.includes(currentTarget)
+            ? [...prev.wrongGuesses, currentTarget]
             : prev.wrongGuesses,
         correctGuesses:
-          correct && !prev.correctGuesses.includes(clickedName)
-            ? [...prev.correctGuesses, clickedName]
+          correct && !prev.correctGuesses.includes(currentTarget)
+            ? [...prev.correctGuesses, currentTarget]
             : prev.correctGuesses,
       };
     });

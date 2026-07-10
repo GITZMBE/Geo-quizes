@@ -184,7 +184,7 @@ export function WorldProximityMode({ cities }: { cities: WorldCity[] }) {
           </div>
           <GameResultActions onPlayAgain={playAgain} />
           <div className="w-full max-w-sm">
-            <Leaderboard key={String(state.finished)} gameSlug={game.slug} mode={mode} />
+            <Leaderboard key={String(state.finished)} gameSlug={game.slug} mode={mode} currentScore={state.totalScore} />
           </div>
         </div>
       )}

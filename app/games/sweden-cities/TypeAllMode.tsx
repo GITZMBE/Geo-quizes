@@ -135,7 +135,12 @@ export function TypeAllMode({ cities }: { cities: City[] }) {
           </p>
           <GameResultActions onPlayAgain={playAgain} />
           <div className="w-full max-w-sm">
-            <Leaderboard key={String(finished)} gameSlug={game.slug} mode={mode} />
+            <Leaderboard
+              key={String(finished)}
+              gameSlug={game.slug}
+              mode={mode}
+              currentScore={state.gaveUp ? undefined : elapsedMs}
+            />
           </div>
         </div>
       )}

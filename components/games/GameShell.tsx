@@ -49,7 +49,7 @@ export function GameShell({
   return (
     <div className="flex flex-1 flex-col gap-4">
       {game.modes.length > 1 && (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {game.modes.map((m) => (
             <button
               key={m.slug}

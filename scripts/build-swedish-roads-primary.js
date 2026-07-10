@@ -318,6 +318,63 @@ function trimChainFromPoint(coords, hitCoord) {
   return lineSlice(point(hitCoord), point(farEnd), lineString(coords)).geometry.coordinates;
 }
 
+function coordDist(a, b) {
+  return Math.sqrt(sqDist(a[0], a[1], b));
+}
+
+// A first attempt at recovering dropped middle chains walked a
+// chain-adjacency graph (chains whose endpoints nearly touch, within a
+// small tolerance) and stitched the resulting path into one line. That
+// failed in practice: a road's own OSM way segments routinely have real
+// gaps of tens of kilometers between them (confirmed on länsväg 222 — the
+// nearest gap between its Stockholm-area chain and any other chain was
+// 0.27-0.36 degrees, tens of km, nowhere close to a "same intersection,
+// different tagging" gap), so almost no path was ever found and most roads
+// fell through to the old two-chain-only fallback anyway.
+//
+// Bounding-box containment is a cruder but far more robust proxy for "this
+// chain is part of the same route, geographically between the two named
+// endpoints": keep any additional chain whose entire extent falls inside
+// the (padded) bounding box spanned by the two hit points, regardless of
+// whether it topologically touches anything. A chain that's part of an
+// unrelated stretch of an international relation (e.g. E45's Denmark/
+// Germany/Italy segments) falls well outside that box and is still
+// dropped, preserving the original overshoot fix; a chain that's a real,
+// gapped middle section of the intended route (e.g. länsväg 222's missing
+// middle) falls inside it and is kept.
+function bbox(coords) {
+  let minLng = Infinity;
+  let minLat = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+  for (const [lng, lat] of coords) {
+    if (lng < minLng) minLng = lng;
+    if (lng > maxLng) maxLng = lng;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+  }
+  return { minLng, minLat, maxLng, maxLat };
+}
+
+function bboxContains(outer, inner) {
+  return (
+    inner.minLng >= outer.minLng &&
+    inner.maxLng <= outer.maxLng &&
+    inner.minLat >= outer.minLat &&
+    inner.maxLat <= outer.maxLat
+  );
+}
+
+// Padding is proportional to the span between the two endpoints (with a
+// floor) so a short local road (a few km apart) doesn't get an oversized
+// box that scoops up unrelated nearby chains, while a long cross-country
+// road still gets enough slack for its own real curvature/detours.
+function paddedBoxBetween(a, b) {
+  const raw = bbox([a, b]);
+  const pad = Math.max(0.05, (raw.maxLng - raw.minLng) * 0.2, (raw.maxLat - raw.minLat) * 0.2);
+  return { minLng: raw.minLng - pad, minLat: raw.minLat - pad, maxLng: raw.maxLng + pad, maxLat: raw.maxLat + pad };
+}
+
 // Returns the clipped geometry plus the two points actually used as its new
 // ends (so callers can store those exact coordinates as fromLat/fromLng/
 // toLat/toLng — the marker then always sits precisely on the drawn line's
@@ -333,15 +390,25 @@ function clipGeometry(geometry, fromGeo, toGeo) {
     return { geometry: { type: "LineString", coordinates: sliced.geometry.coordinates }, fromPoint: fromHit.coord, toPoint: toHit.coord };
   }
 
-  // fromPlace and toPlace landed on two different disconnected chains — a
-  // genuine gap in the route. Keep just those two chains, each trimmed back
-  // from its own far end; drop any other unrelated chains entirely (the
-  // same kind of extraneous relation content the single-chain case above
-  // clips away, just shaped as a whole separate chain instead of a tail).
+  // fromPlace and toPlace landed on two different chains — keep both,
+  // trimmed back from their hit points, plus any other chain that falls
+  // entirely inside the box between them (see bboxContains reasoning
+  // above). Any chain outside that box is dropped as extraneous relation
+  // content, same as before.
   const fromLine = trimChainFromPoint(lines[fromHit.lineIndex], fromHit.coord);
   const toLine = trimChainFromPoint(lines[toHit.lineIndex], toHit.coord);
+  const box = paddedBoxBetween(fromHit.coord, toHit.coord);
+  const middleLines = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (i === fromHit.lineIndex || i === toHit.lineIndex) continue;
+    if (bboxContains(box, bbox(lines[i]))) middleLines.push(lines[i]);
+  }
+  const outLines = [fromLine, ...middleLines, toLine];
   return {
-    geometry: { type: "MultiLineString", coordinates: [fromLine, toLine] },
+    geometry:
+      outLines.length === 1
+        ? { type: "LineString", coordinates: outLines[0] }
+        : { type: "MultiLineString", coordinates: outLines },
     fromPoint: fromHit.coord,
     toPoint: toHit.coord,
   };
@@ -429,7 +496,12 @@ async function assignEndpointCoordsAndClip(feature) {
   // whichever geometry extremity is FARTHEST from that point. An arbitrary
   // array-order pick here (the previous version of this fallback) reintroduces
   // exactly the swapped-labels bug this whole function exists to fix, just
-  // for this subset of roads instead of all of them.
+  // for this subset of roads instead of all of them. The geometry itself is
+  // ALSO clipped here now (previously returned fully unclipped) — the same
+  // trim-plus-bbox-containment approach as clipGeometry, using the resolved
+  // hit and the chosen far extremity as the two anchor points, so a road
+  // whose relation extends into another country past its border-description
+  // endpoint doesn't render that whole extra stretch.
   const knownGeo = fromGeo || toGeo;
   if (knownGeo) {
     const lines = feature.geometry.type === "LineString" ? [feature.geometry.coordinates] : feature.geometry.coordinates;
@@ -445,9 +517,23 @@ async function assignEndpointCoordsAndClip(feature) {
           far = c;
         }
       }
+      const farLineIndex = lines.findIndex((l) => l[0] === far || l[l.length - 1] === far);
+      const hitLine = trimChainFromPoint(lines[hit.lineIndex], hit.coord);
+      const box = paddedBoxBetween(hit.coord, far);
+      const middleLines = [];
+      for (let i = 0; i < lines.length; i++) {
+        if (i === hit.lineIndex || i === farLineIndex) continue;
+        if (bboxContains(box, bbox(lines[i]))) middleLines.push(lines[i]);
+      }
+      const farLine = farLineIndex >= 0 ? lines[farLineIndex] : [far];
+      const outLines = [hitLine, ...middleLines, farLine];
+      const clippedGeometry =
+        outLines.length === 1
+          ? { type: "LineString", coordinates: outLines[0] }
+          : { type: "MultiLineString", coordinates: outLines };
       return fromGeo
-        ? { geometry: feature.geometry, fromLat: hit.coord[1], fromLng: hit.coord[0], toLat: far[1], toLng: far[0] }
-        : { geometry: feature.geometry, fromLat: far[1], fromLng: far[0], toLat: hit.coord[1], toLng: hit.coord[0] };
+        ? { geometry: clippedGeometry, fromLat: hit.coord[1], fromLng: hit.coord[0], toLat: far[1], toLng: far[0] }
+        : { geometry: clippedGeometry, fromLat: far[1], fromLng: far[0], toLat: hit.coord[1], toLng: hit.coord[0] };
     }
   }
 

@@ -97,6 +97,19 @@ export type RoadFeature = RegionFeature & {
     roadType: RoadType;
     fromPlace: string;
     toPlace: string;
+    // The actual geometry endpoint each place name corresponds to, fixed at
+    // data-build time (see scripts/build-swedish-roads-{primary,secondary}.js).
+    // A road's geometry is assembled from possibly-multiple OSM way/relation
+    // segments, so "first/last coordinate of the geometry" isn't reliably
+    // fromPlace/toPlace's real-world location — deriving it from compass
+    // direction at render time was tried and was wrong for any road that
+    // doesn't happen to run southwest-to-northeast. These are computed once
+    // by geocoding fromPlace/toPlace and matching each to its nearer
+    // geometry extremity, so rendering never has to guess.
+    fromLat: number;
+    fromLng: number;
+    toLat: number;
+    toLng: number;
   };
   geometry: { type: "LineString" | "MultiLineString"; coordinates: unknown };
 };

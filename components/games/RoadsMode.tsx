@@ -13,46 +13,21 @@ import { normalizeRoadAnswer } from "@/lib/games/text";
 
 const ROUND_SIZE = 5;
 
-// A road assembled from multiple OSM relation segments (common — many of
-// these roads merge 2+ segments) doesn't have its segments necessarily
-// concatenated in true end-to-end geographic order, so "first/last
-// coordinate of the geometry array" can land a marker in the middle of the
-// route instead of at its real extremity. Instead: take every segment's own
-// two endpoints as candidates, and pick the pair that's farthest apart —
-// the true geographic ends of a real point-to-point road are reliably
-// among a segment boundary, even when segment order itself is jumbled.
-function geographicExtremes(geometry: RoadFeature["geometry"]) {
-  const lines: [number, number][][] =
-    geometry.type === "LineString" ? [geometry.coordinates as [number, number][]] : (geometry.coordinates as [number, number][][]);
-  const candidates = lines.flatMap((line) => [line[0], line[line.length - 1]]);
-
-  let best: { a: [number, number]; b: [number, number]; dist: number } | null = null;
-  for (let i = 0; i < candidates.length; i++) {
-    for (let j = i + 1; j < candidates.length; j++) {
-      const [aLng, aLat] = candidates[i];
-      const [bLng, bLat] = candidates[j];
-      const dist = (aLng - bLng) ** 2 + (aLat - bLat) ** 2;
-      if (!best || dist > best.dist) best = { a: candidates[i], b: candidates[j], dist };
-    }
-  }
-  return best ? [best.a, best.b] : [candidates[0], candidates[0]];
-}
-
 function isLineFeature(feature: RegionFeature) {
   return feature.geometry.type === "LineString" || feature.geometry.type === "MultiLineString";
 }
 
-// Swedish national/county road numbers are assigned southwest-to-northeast
-// (stated on the Wikipedia source this data comes from), so once the two
-// geographic extremes are found, the more southwesterly one is fromPlace —
-// approximated as the smaller lat+lng sum, matching that diagonal.
+// fromLat/fromLng/toLat/toLng are fixed at data-build time (see
+// scripts/build-swedish-roads-{primary,secondary}.js) by geocoding
+// fromPlace/toPlace and matching each to its nearer geometry extremity —
+// deriving this from geometry/compass-direction at render time was tried
+// and was wrong for any road that doesn't happen to run southwest-to-
+// northeast, so this reads the precomputed, per-road-correct coordinates
+// directly instead of guessing.
 function endpointMarkers(road: RoadFeature) {
-  const [p1, p2] = geographicExtremes(road.geometry);
-  const sw = p1[0] + p1[1] <= p2[0] + p2[1] ? p1 : p2;
-  const ne = sw === p1 ? p2 : p1;
   return [
-    { lat: sw[1], lng: sw[0], label: road.properties.fromPlace },
-    { lat: ne[1], lng: ne[0], label: road.properties.toPlace },
+    { lat: road.properties.fromLat, lng: road.properties.fromLng, label: road.properties.fromPlace },
+    { lat: road.properties.toLat, lng: road.properties.toLng, label: road.properties.toPlace },
   ];
 }
 
@@ -229,7 +204,7 @@ export function RoadsMode({
           </div>
           <GameResultActions onPlayAgain={playAgain} />
           <div className="w-full max-w-sm">
-            <Leaderboard key={String(state.finished)} gameSlug={game.slug} mode={mode} />
+            <Leaderboard key={String(state.finished)} gameSlug={game.slug} mode={mode} currentScore={state.score} />
           </div>
         </div>
       )}

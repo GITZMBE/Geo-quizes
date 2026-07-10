@@ -223,26 +223,42 @@ function nearestLocality(lng, lat, localities) {
 
 // --- Per-county pipeline --------------------------------------------------
 
+// A whole county used to be thrown away (0 roads) if even one highway
+// class's tag query exhausted its retries — wasteful when the other two
+// classes succeeded fine. Catch per-class and continue with whatever
+// classes came through; log what was skipped rather than silently
+// under-counting.
 async function fetchCountyWayList(county) {
   const cachePath = path.join(SCRATCH_DIR, `secondary_${county.letter}_ways.json`);
   if (fs.existsSync(cachePath)) return JSON.parse(fs.readFileSync(cachePath, "utf8"));
 
   const areaId = 3600000000 + county.relationId;
   let all = [];
+  const skipped = [];
   for (const hw of HIGHWAY_CLASSES) {
     console.log(`  fetching ${hw} ways with ref in ${county.name}...`);
-    const query = `[out:json][timeout:150];area(${areaId})->.a;way(area.a)["highway"="${hw}"]["ref"];out tags;`;
-    const elements = await overpass(query, { label: `${county.letter}:${hw}:tags` });
-    all = all.concat(elements.map((e) => ({ id: e.id, ref: e.tags.ref })));
+    try {
+      const query = `[out:json][timeout:150];area(${areaId})->.a;way(area.a)["highway"="${hw}"]["ref"];out tags;`;
+      const elements = await overpass(query, { label: `${county.letter}:${hw}:tags` });
+      all = all.concat(elements.map((e) => ({ id: e.id, ref: e.tags.ref })));
+    } catch (err) {
+      console.warn(`  SKIPPING highway=${hw} for ${county.name}: ${err.message?.slice(0, 150)}`);
+      skipped.push(hw);
+    }
     await sleep(2000);
   }
+  if (skipped.length) console.warn(`  [${county.letter}] incomplete — skipped classes: ${skipped.join(", ")}`);
   fs.writeFileSync(cachePath, JSON.stringify(all));
   return all;
 }
 
+// Same reasoning as fetchCountyWayList: a single stubborn chunk used to
+// throw and lose every other chunk's already-fetched geometry for this
+// county. Skip just that chunk's way ids (logged) and keep going.
 async function fetchGeometryForIds(ids, cacheKeyPrefix) {
   const CHUNK = 150;
   const byId = new Map();
+  const failedChunks = [];
   for (let i = 0; i < ids.length; i += CHUNK) {
     const chunk = ids.slice(i, i + CHUNK);
     const cachePath = path.join(SCRATCH_DIR, `${cacheKeyPrefix}_geom_${i}.json`);
@@ -251,13 +267,20 @@ async function fetchGeometryForIds(ids, cacheKeyPrefix) {
       elements = JSON.parse(fs.readFileSync(cachePath, "utf8"));
     } else {
       console.log(`    geometry chunk ${i + 1}-${i + chunk.length} of ${ids.length}...`);
-      const query = `[out:json][timeout:170];way(id:${chunk.join(",")});out geom;`;
-      elements = await overpass(query, { label: `${cacheKeyPrefix}:geom` });
-      fs.writeFileSync(cachePath, JSON.stringify(elements));
+      try {
+        const query = `[out:json][timeout:170];way(id:${chunk.join(",")});out geom;`;
+        elements = await overpass(query, { label: `${cacheKeyPrefix}:geom` });
+        fs.writeFileSync(cachePath, JSON.stringify(elements));
+      } catch (err) {
+        console.warn(`    SKIPPING chunk ${i + 1}-${i + chunk.length}: ${err.message?.slice(0, 150)}`);
+        failedChunks.push([i, i + chunk.length]);
+        elements = [];
+      }
       await sleep(2000);
     }
     for (const el of elements) if (el.type === "way") byId.set(el.id, el);
   }
+  if (failedChunks.length) console.warn(`    [${cacheKeyPrefix}] ${failedChunks.length} chunk(s) skipped: ${JSON.stringify(failedChunks)}`);
   return byId;
 }
 
@@ -300,6 +323,16 @@ async function processCounty(county, localities) {
         roadType: "lansvag",
         fromPlace,
         toPlace,
+        // sw/ne ARE the exact points fromPlace/toPlace were looked up
+        // against above, so storing them directly here is correct by
+        // construction — no separate geocode-and-match step needed, unlike
+        // the primary tier (see build-swedish-roads-primary.js), where
+        // fromPlace/toPlace come from Wikipedia text with no built-in tie
+        // to a geometry endpoint.
+        fromLat: sw[1],
+        fromLng: sw[0],
+        toLat: ne[1],
+        toLng: ne[0],
       },
       geometry: simplified.geometry,
     });

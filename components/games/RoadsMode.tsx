@@ -121,6 +121,15 @@ export function RoadsMode({
     });
   }
 
+  if (roads.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
+        <p className="text-lg font-medium">No roads available for this mode yet.</p>
+        <p>Check back soon — more road data is on the way.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-4">
       {!state.finished ? (

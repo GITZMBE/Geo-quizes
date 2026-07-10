@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapView } from "@/components/MapView";
 import { Leaderboard } from "@/components/Leaderboard";
 import { GameResultActions } from "@/components/games/GameResultActions";
-import type { RoadFeature } from "@/lib/games/data";
+import { fetchRegions, type RegionFeature, type RoadFeature } from "@/lib/games/data";
 import { useRoundGame } from "@/lib/games/useRoundGame";
 import { useGameState } from "@/lib/state/useGameState";
 import { getRoundState } from "@/lib/state/gameAtoms";
@@ -36,6 +36,10 @@ function geographicExtremes(geometry: RoadFeature["geometry"]) {
     }
   }
   return best ? [best.a, best.b] : [candidates[0], candidates[0]];
+}
+
+function isLineFeature(feature: RegionFeature) {
+  return feature.geometry.type === "LineString" || feature.geometry.type === "MultiLineString";
 }
 
 // Swedish national/county road numbers are assigned southwest-to-northeast
@@ -86,8 +90,32 @@ export function RoadsMode({
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Sweden's own outline, drawn as background context so the highlighted
+  // road reads as "a road somewhere in Sweden" instead of an isolated
+  // squiggle with no frame of reference — reused from the Countries of
+  // Europe game's data rather than sourcing a dedicated Sweden-only file.
+  // Combining it into MapView's regionsData also means fitSize fits the
+  // whole country (Sweden's extent dwarfs any single road's), so the
+  // default zoomed-out view shows all of Sweden instead of just the
+  // road's own tight bounding box.
+  const [sweden, setSweden] = useState<RegionFeature | null>(null);
+  useEffect(() => {
+    fetchRegions("/data/countries_europe.json").then((features) => {
+      setSweden(features.find((f) => f.properties.name === "Sweden") ?? null);
+    });
+  }, []);
+
   const byName = new Map(items.map((r) => [r.properties.name, r]));
   const targetRoad = target ? byName.get(target) : undefined;
+
+  // Memoized so this array keeps a stable identity across re-renders where
+  // neither sweden nor targetRoad actually changed — MapView resets its
+  // zoom/pan whenever regionsData's identity changes, so a fresh array
+  // literal every render would reset the player's zoom on every keystroke.
+  const mapData = useMemo<RegionFeature[]>(() => {
+    if (!targetRoad) return [];
+    return sweden ? [sweden, targetRoad] : [targetRoad];
+  }, [sweden, targetRoad]);
 
   // Same reason as CapitalsMode: the input is disabled during the
   // correct/wrong feedback window, which browser-blurs it.
@@ -161,17 +189,18 @@ export function RoadsMode({
           <div className="relative min-h-[320px] flex-1 overflow-hidden rounded-lg border border-border">
             {targetRoad && (
               <MapView
-                regionsData={[targetRoad]}
+                regionsData={mapData}
                 projection={projection}
-                fill={() => "none"}
-                stroke={() =>
-                  state.lastResult === "correct"
+                fill={(f) => (isLineFeature(f) ? "none" : "var(--muted)")}
+                stroke={(f) => {
+                  if (!isLineFeature(f)) return "var(--border)";
+                  return state.lastResult === "correct"
                     ? "var(--success)"
                     : state.lastResult === "wrong"
                       ? "var(--error)"
-                      : "var(--primary)"
-                }
-                strokeWidth={() => 4}
+                      : "var(--primary)";
+                }}
+                strokeWidth={(f) => (isLineFeature(f) ? 4 : 1)}
                 markers={endpointMarkers(targetRoad)}
               />
             )}

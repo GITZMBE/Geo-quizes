@@ -38,12 +38,20 @@ const MAX_SCALE = 10;
 const WHEEL_ZOOM_FACTOR = 1.2;
 const BUTTON_ZOOM_FACTOR = 1.5;
 
-// Below this projected bounding-box size (px, in either dimension), a
-// region's own outline is too small to click reliably at the default zoom
-// level — Vatican City, Singapore, small Pacific/Caribbean island nations,
-// Rhode Island, etc. Rendering a circle marker at its centroid guarantees a
-// clickable target without requiring the player to zoom in first.
-const SMALL_REGION_PX = 10;
+// Below this projected area (px², computed once per projection/container
+// size, not on every zoom/pan), a region is too small to click reliably at
+// the default zoom level — Vatican City, Singapore, Rhode Island, etc.
+// Rendering a circle marker at its centroid guarantees a clickable target
+// without requiring the player to zoom in first.
+//
+// This has to be an area check, not a bounding-box check (the original
+// approach): a scattered-island nation's bounding box spans the gaps
+// between its islands, not how much of them is actually visible — Kiribati,
+// Micronesia, Marshall Islands, Palau, and Tonga all have a large enough
+// bounding box to pass a size check while every individual island renders
+// as a sub-pixel dot (confirmed by computing both for every country: e.g.
+// Micronesia's bbox is ~210x60px but its total projected area is ~3px²).
+const SMALL_REGION_AREA_PX = 60;
 const SMALL_REGION_MARKER_RADIUS = 5;
 
 type Transform = { x: number; y: number; k: number };
@@ -173,13 +181,29 @@ export function MapView<T extends RegionFeature>({
   const smallRegions = useMemo(() => {
     if (!pathFor) return [];
     return regionsData.flatMap((feature) => {
-      const bounds = pathFor.bounds(feature as unknown as GeoPermissibleObjects);
-      const width = bounds[1][0] - bounds[0][0];
-      const height = bounds[1][1] - bounds[0][1];
-      if (width >= SMALL_REGION_PX || height >= SMALL_REGION_PX) return [];
-      const centroid = pathFor.centroid(feature as unknown as GeoPermissibleObjects);
-      if (Number.isNaN(centroid[0]) || Number.isNaN(centroid[1])) return [];
-      return [{ feature, x: centroid[0], y: centroid[1] }];
+      const totalArea = pathFor.area(feature as unknown as GeoPermissibleObjects);
+      if (totalArea >= SMALL_REGION_AREA_PX) return [];
+
+      // A scattered-island nation's own centroid can land in open water
+      // (its islands' bounding box spans the gaps between them, and the
+      // centroid is pulled toward whichever part has the most vertices) —
+      // anchor the marker on the centroid of its single largest part
+      // instead, which is always inside actual territory.
+      const geometry = feature.geometry;
+      const parts =
+        geometry.type === "MultiPolygon"
+          ? (geometry.coordinates as unknown[])
+          : [geometry.coordinates];
+      let best: { area: number; centroid: [number, number] } | null = null;
+      for (const part of parts) {
+        const polygon = { type: "Polygon", coordinates: part } as unknown as GeoPermissibleObjects;
+        const area = pathFor.area(polygon);
+        if (!best || area > best.area) {
+          best = { area, centroid: pathFor.centroid(polygon) };
+        }
+      }
+      if (!best || Number.isNaN(best.centroid[0]) || Number.isNaN(best.centroid[1])) return [];
+      return [{ feature, x: best.centroid[0], y: best.centroid[1] }];
     });
   }, [pathFor, regionsData]);
 
